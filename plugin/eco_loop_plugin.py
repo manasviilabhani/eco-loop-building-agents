@@ -19,8 +19,10 @@ Each simulated hour (on the hour):
 """
 
 import json
+import time
 import urllib.request
 import urllib.error
+import uuid
 
 from pyenergyplus.plugin import EnergyPlusPlugin
 
@@ -75,6 +77,12 @@ class EcoLoopController(EnergyPlusPlugin):
         self.last_good_cooling_c = None
         self.last_good_heating_c = None
 
+        # Identifies this simulation run for the live dashboard view (see
+        # agent/live_push.py) -- generated once per EnergyPlus process so
+        # separate runs don't get plotted as one continuous series.
+        self.run_id = f"{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+        self.hour_index = 0
+
         self.h = {}  # sensor/actuator handles, keyed by name
 
     def _init_handles(self, state):
@@ -113,6 +121,8 @@ class EcoLoopController(EnergyPlusPlugin):
             }
         hour = exch.hour(state)
         return {
+            "run_id": self.run_id,
+            "hour_index": self.hour_index,
             "sim_time": f"{exch.month(state):02d}-{exch.day_of_month(state):02d} {hour:02d}:00",
             "zones": zones,
             "facility_demand_w": exch.get_variable_value(state, self.h["facility_demand"]),
@@ -161,6 +171,7 @@ class EcoLoopController(EnergyPlusPlugin):
                 self._apply_setpoints(state, self.last_good_cooling_c, self.last_good_heating_c)
             return 0
         self.last_decision_hour_key = day_key
+        self.hour_index += 1
 
         snapshot = self._build_snapshot(state)
 

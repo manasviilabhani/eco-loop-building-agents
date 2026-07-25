@@ -26,6 +26,7 @@ import logging
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from agent.agent_loop import decide_async, diagnose_and_patch_async
+from agent.live_push import push_decision
 from agent.shared_state import SimSnapshot, ZoneReading
 
 HOST = "127.0.0.1"
@@ -83,6 +84,7 @@ async def _handle_decide(body: dict) -> dict:
             result = dict(_last_decision)
             result["short_circuited"] = True
             _last_snapshot = snapshot
+            _push_live(body, result)
             return result
 
     try:
@@ -97,7 +99,18 @@ async def _handle_decide(body: dict) -> dict:
     _last_snapshot = snapshot
     if result.get("ok"):
         _last_decision = result
+    _push_live(body, result)
     return result
+
+
+def _push_live(body: dict, result: dict) -> None:
+    """Best-effort push to the live dashboard view -- only fires if the
+    plugin included run_id/hour_index (added specifically for the live
+    demo) and only if a decision was actually made (holding last-known-good
+    on failure isn't a new data point worth showing live)."""
+    if "run_id" not in body or "hour_index" not in body or not result.get("ok"):
+        return
+    push_decision(body["run_id"], body["hour_index"], body, result)
 
 
 async def _handle_diagnose(body: dict) -> dict:
