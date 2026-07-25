@@ -72,9 +72,9 @@ sometimes changed nothing) -- another concrete self-correction story.
   schedule design)
 
 ## 8. Deliverables checklist (for the closing slide)
-- [x] GitHub repo, unified Python codebase
+- [x] GitHub repo, unified Python codebase — https://github.com/manasviilabhani/eco-loop-building-agents
 - [x] Baseline + runtime-modified building models
-- [x] Quantitative savings dashboard (Streamlit; run `streamlit run dashboard/app.py`)
+- [x] Quantitative savings dashboard — live at https://eco-loop-building-agents-utkqsp2jfshzz9x9vxarer.streamlit.app/
 - [x] System architecture document
 - [ ] Demo video (needs to be screen-recorded by you)
-- [ ] Push repo to GitHub + submit via portal (needs your GitHub account + the portal upload)
+- [ ] Submit via portal (GitHub URL above + PDF/zip upload per the brief's instructions)

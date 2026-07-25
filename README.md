@@ -11,6 +11,8 @@ See `docs/ARCHITECTURE.md` for the full design writeup (process boundary,
 tool-calling design, prompt/latency strategy, self-healing, honest
 tradeoffs).
 
+**Live dashboard:** https://eco-loop-building-agents-utkqsp2jfshzz9x9vxarer.streamlit.app/
+
 ## Results (full week, verified)
 
 | | Baseline | AI closed-loop | Change |
