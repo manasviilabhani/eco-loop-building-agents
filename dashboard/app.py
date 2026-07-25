@@ -51,8 +51,8 @@ st.caption(
 st.divider()
 st.subheader("Time series: energy demand")
 
-baseline_df = pd.read_csv(baseline["timeseries_csv"])
-ai_df = pd.read_csv(ai["timeseries_csv"])
+baseline_df = pd.read_csv(REPO / baseline["timeseries_csv"])
+ai_df = pd.read_csv(REPO / ai["timeseries_csv"])
 baseline_df.columns = [c.strip() for c in baseline_df.columns]
 ai_df.columns = [c.strip() for c in ai_df.columns]
 

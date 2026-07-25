@@ -63,7 +63,10 @@ def summarize(out_dir: Path) -> dict:
         "pmv_violations": violations,
         "pmv_readings": total_readings,
         "pmv_violation_pct": round(100 * violations / total_readings, 2),
-        "timeseries_csv": str(out_dir / "eplusout.csv"),
+        # Relative to repo root, not absolute -- comparison_summary.json is
+        # committed and read by the dashboard wherever it's deployed, not
+        # just on the machine that produced it.
+        "timeseries_csv": str((out_dir / "eplusout.csv").relative_to(REPO)),
     }
 
 

@@ -5,7 +5,7 @@
     "pmv_violations": 46,
     "pmv_readings": 1100,
     "pmv_violation_pct": 4.18,
-    "timeseries_csv": "/Users/manasvilabhani/eco-loop-building-agents/runs/baseline_full/eplusout.csv"
+    "timeseries_csv": "runs/baseline_full/eplusout.csv"
   },
   "ai_closed_loop": {
     "total_kwh": 887.4,
@@ -13,7 +13,7 @@
     "pmv_violations": 115,
     "pmv_readings": 1100,
     "pmv_violation_pct": 10.45,
-    "timeseries_csv": "/Users/manasvilabhani/eco-loop-building-agents/runs/ai_closed_loop_full/eplusout.csv"
+    "timeseries_csv": "runs/ai_closed_loop_full/eplusout.csv"
   },
   "kwh_reduction_pct": 3.56
 }
