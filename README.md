@@ -2,33 +2,30 @@
 
 Closed-loop building energy control: EnergyPlus simulates a building and
 streams live telemetry; a local open-source LLM (Qwen2.5 7B via Ollama)
-reasons over that telemetry through MCP tool calls and writes control
-actions (zone setpoints) back into the *running* simulation via the
+reasons over that telemetry through real MCP tool calls and writes control
+actions (HVAC setpoints) back into the *running* simulation via the
 EnergyPlus Python Plugin / Actuator API — true mid-simulation Forward
 Injection, not an edit-and-rerun batch loop.
 
-## Status
-
-Scaffolding stage. See `docs/ARCHITECTURE.md` for the design doc (filled in
-incrementally) and the repo's plan for the phased build order:
-
-0. Environment setup — EnergyPlus, Ollama, Python 3.11+
-1. Baseline simulation (unmodified schedule-driven run)
-2. Closed loop — plugin + MCP server + agent, real actuator injection
-3. Self-healing error recovery — agent diagnoses & patches broken IDFs
-4. Savings dashboard — baseline vs. AI-driven % kWh reduction
-5. Docs, demo video, submission
+See `docs/ARCHITECTURE.md` for the full design writeup (process boundary,
+tool-calling design, prompt/latency strategy, self-healing, honest
+tradeoffs).
 
 ## Repo layout
 
-- `models/` — baseline `.idf` + weather file, plus runtime-modified/broken
-  variants used to demo self-healing
-- `plugin/` — `eco_loop_plugin.py`, the EnergyPlus Python Plugin in-sim hook
-- `agent/` — MCP server (`mcp_server.py`), tool implementations
-  (`tools.py`), and the LLM decision loop (`agent_loop.py`)
-- `runs/` — per-run EnergyPlus outputs and summaries (gitignored bulk)
-- `dashboard/` — Streamlit app comparing baseline vs. AI closed-loop runs
+- `models/` — baseline `.idf` + weather file, the AI closed-loop variant,
+  broken variants for the self-healing demo, and the prep scripts that
+  generate all of them from EnergyPlus's stock `5ZoneAirCooled.idf`
+- `plugin/eco_loop_plugin.py` — the EnergyPlus Python Plugin in-sim hook
+  (stdlib-only; talks to the agent over HTTP, see architecture doc for why)
+- `agent/` — MCP server (`mcp_server.py`, `tools.py`), the LLM decision loop
+  (`agent_loop.py`), and the HTTP service (`service.py`) the plugin calls
+- `scripts/` — `run_comparison.py` (baseline vs. AI full-week run + summary
+  export), `self_heal_runner.py` (crash → diagnose → patch → retry loop)
+- `dashboard/app.py` — Streamlit app comparing baseline vs. AI closed-loop
 - `docs/ARCHITECTURE.md` — system architecture deliverable
+- `runs/` — per-run EnergyPlus outputs and the comparison summary
+  (gitignored bulk; `comparison_summary.json` is what the dashboard reads)
 
 ## Setup
 
@@ -37,14 +34,53 @@ python3.11 -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
 
-# EnergyPlus: install the macOS ARM64 .pkg from
-# https://github.com/NREL/EnergyPlus/releases (see setup notes, Phase 0)
+# EnergyPlus 26.1.0 (macOS arm64): install the .pkg from
+# https://github.com/NatLabRockies/EnergyPlus/releases/tag/v26.1.0
+# (default install path assumed by all scripts here: /Applications/EnergyPlus-26-1-0)
 
-# Ollama:
 brew install ollama
 ollama pull qwen2.5:7b-instruct
 ```
 
 ## Run
 
-TODO: filled in as each phase's run script lands.
+1. **Start the agent service** (must be running before any closed-loop or
+   self-heal run):
+   ```
+   source .venv/bin/activate
+   python -m agent.service   # listens on 127.0.0.1:8765
+   ```
+
+2. **Regenerate the models** (only needed after editing a `prepare_*.py` /
+   `seed_broken_variants.py` script):
+   ```
+   python models/prepare_baseline.py
+   python models/prepare_ai_closed_loop.py
+   python models/seed_broken_variants.py
+   ```
+
+3. **Baseline vs. AI closed-loop comparison** (full week, produces
+   `runs/comparison_summary.json` for the dashboard):
+   ```
+   python scripts/run_comparison.py
+   ```
+
+4. **Self-healing demo** (crash → diagnose → patch → rerun):
+   ```
+   python scripts/self_heal_runner.py models/broken_bad_people_count.idf
+   python scripts/self_heal_runner.py models/broken_dangling_schedule.idf
+   python scripts/self_heal_runner.py models/broken_invalid_comfort_model.idf
+   ```
+
+5. **Dashboard** (after step 3 has produced `comparison_summary.json`):
+   ```
+   streamlit run dashboard/app.py
+   ```
+
+## Notes
+
+- Building: EnergyPlus's bundled `5ZoneAirCooled.idf` (5-zone packaged-AC
+  office), trimmed to July 1-7 (Chicago, `USA_IL_Chicago-OHare.Intl.AP.725300_TMY3.epw`)
+  to keep iteration fast; see `docs/ARCHITECTURE.md` for why.
+- The agent decides once per simulated hour, not every timestep — also
+  covered in the architecture doc.
