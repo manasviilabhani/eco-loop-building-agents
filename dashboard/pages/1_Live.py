@@ -36,7 +36,7 @@ def fetch_latest_run_id() -> str | None:
     resp = requests.get(
         f"{SUPABASE_URL}/rest/v1/live_decisions",
         headers=HEADERS,
-        params={"select": "run_id", "order": "hour_index.desc", "limit": 1},
+        params={"select": "run_id", "kind": "eq.ai_closed_loop", "order": "created_at.desc", "limit": 1},
         timeout=10,
     )
     resp.raise_for_status()
@@ -55,9 +55,22 @@ def fetch_run(run_id: str) -> pd.DataFrame:
     return pd.DataFrame(resp.json())
 
 
+def fetch_baseline() -> pd.DataFrame:
+    resp = requests.get(
+        f"{SUPABASE_URL}/rest/v1/live_decisions",
+        headers=HEADERS,
+        params={"run_id": "eq.baseline-reference", "order": "hour_index.asc"},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    return pd.DataFrame(resp.json())
+
+
 @st.fragment(run_every="3s")
 def live_section():
     run_id = fetch_latest_run_id()
+    baseline_df = fetch_baseline()
+
     if run_id is None:
         st.info(
             "No live run yet. Start one locally: set SUPABASE_URL / SUPABASE_ANON_KEY, "
@@ -68,20 +81,51 @@ def live_section():
 
     df = fetch_run(run_id)
     st.caption(f"run_id: `{run_id}` -- {len(df)} decision(s) so far, latest: {df['sim_time'].iloc[-1]}")
+    if baseline_df.empty:
+        st.caption(
+            "No baseline reference loaded yet -- run `python scripts/push_baseline_live.py` "
+            "locally to show the no-AI comparison line."
+        )
 
+    latest_kw = df["facility_demand_w"].iloc[-1] / 1000
     col1, col2, col3 = st.columns(3)
-    col1.metric("Latest facility demand", f"{df['facility_demand_w'].iloc[-1]/1000:.2f} kW")
+    col1.metric("Latest facility demand (AI)", f"{latest_kw:.2f} kW")
     col2.metric("Latest cooling setpoint", f"{df['cooling_setpoint_c'].iloc[-1]:.1f} C")
     col3.metric("Latest heating setpoint", f"{df['heating_setpoint_c'].iloc[-1]:.1f} C")
 
     fig = go.Figure()
-    fig.add_trace(go.Scatter(x=df["hour_index"], y=df["facility_demand_w"] / 1000, name="Facility demand (kW)"))
+    if not baseline_df.empty:
+        fig.add_trace(
+            go.Scatter(
+                x=baseline_df["hour_index"],
+                y=baseline_df["facility_demand_w"] / 1000,
+                name="Baseline (no AI)",
+                line=dict(color="#888"),
+            )
+        )
+    fig.add_trace(
+        go.Scatter(
+            x=df["hour_index"],
+            y=df["facility_demand_w"] / 1000,
+            name="AI closed-loop (live)",
+            line=dict(color="#2ca02c"),
+        )
+    )
     fig.update_layout(xaxis_title="Decision cycle (hour)", yaxis_title="kW", height=350)
     st.plotly_chart(fig, use_container_width=True)
 
     fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(x=df["hour_index"], y=df["cooling_setpoint_c"], name="Cooling setpoint"))
-    fig2.add_trace(go.Scatter(x=df["hour_index"], y=df["heating_setpoint_c"], name="Heating setpoint"))
+    fig2.add_trace(go.Scatter(x=df["hour_index"], y=df["cooling_setpoint_c"], name="Cooling setpoint (AI)"))
+    fig2.add_trace(go.Scatter(x=df["hour_index"], y=df["heating_setpoint_c"], name="Heating setpoint (AI)"))
+    if not baseline_df.empty:
+        fig2.add_trace(
+            go.Scatter(
+                x=baseline_df["hour_index"],
+                y=baseline_df["cooling_setpoint_c"],
+                name="Cooling setpoint (baseline)",
+                line=dict(color="#888", dash="dot"),
+            )
+        )
     fig2.update_layout(xaxis_title="Decision cycle (hour)", yaxis_title="Setpoint (C)", height=350)
     st.plotly_chart(fig2, use_container_width=True)
 

@@ -33,6 +33,7 @@ def push_decision(run_id: str, hour_index: int, snapshot: dict, decision: dict) 
 
     row = {
         "run_id": run_id,
+        "kind": "ai_closed_loop",
         "hour_index": hour_index,
         "sim_time": snapshot["sim_time"],
         "zone_temps": {z: v["temp_c"] for z, v in snapshot["zones"].items()},
