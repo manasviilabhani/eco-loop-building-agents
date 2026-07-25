@@ -8,12 +8,12 @@
     "timeseries_csv": "/Users/manasvilabhani/eco-loop-building-agents/runs/baseline_full/eplusout.csv"
   },
   "ai_closed_loop": {
-    "total_kwh": 911.9,
-    "peak_demand_w": 20187.3,
-    "pmv_violations": 203,
+    "total_kwh": 919.8,
+    "peak_demand_w": 19309.4,
+    "pmv_violations": 107,
     "pmv_readings": 1100,
-    "pmv_violation_pct": 18.45,
+    "pmv_violation_pct": 9.73,
     "timeseries_csv": "/Users/manasvilabhani/eco-loop-building-agents/runs/ai_closed_loop_full/eplusout.csv"
   },
-  "kwh_reduction_pct": 4.9
+  "kwh_reduction_pct": 4.08
 }

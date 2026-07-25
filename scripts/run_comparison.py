@@ -37,7 +37,7 @@ def summarize(out_dir: Path) -> dict:
     df.columns = [c.strip() for c in df.columns]
 
     zones = ["SPACE1-1", "SPACE2-1", "SPACE3-1", "SPACE4-1", "SPACE5-1"]
-    pmv_cols = [f"{z} PEOPLE:Zone Thermal Comfort Fanger Model PMV [](TimeStep)" for z in zones]
+    pmv_cols = [f"{z} PEOPLE 1:Zone Thermal Comfort Fanger Model PMV [](TimeStep)" for z in zones]
     demand_col = "Whole Building:Facility Total Electricity Demand Rate [W](TimeStep)"
     elec_col = "Electricity:Facility [J](TimeStep)"
     occupied_col = "OCCUPY-1:Schedule Value [](TimeStep)"

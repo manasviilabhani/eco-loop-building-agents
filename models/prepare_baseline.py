@@ -5,9 +5,16 @@ Changes made to the stock example file:
     each simulation run takes seconds, not minutes -- needed since we run
     this many times (baseline, AI closed-loop, broken-variant self-heal
     tests) within a hackathon time budget.
-  - Adds People objects (one per zone, Fanger comfort model) since the stock
-    file has zero occupants and therefore no PMV output at all -- PMV is a
-    required brief metric ("Thermal Comfort & Constraints", 20% of grading).
+  - Adds a Fanger comfort model to each zone's EXISTING People object (the
+    stock file already defines one People object per zone, e.g. "SPACE1-1
+    People 1", wired to a real OCCUPY-1/ActSchd occupancy pattern -- an
+    earlier version of this script mistakenly created a second, duplicate
+    People object per zone instead of extending the real one, which silently
+    double-counted internal heat gains AND made the self-healing demo flaky
+    (two "SPACE2-1 People*" objects made object-name matching ambiguous).
+    PMV output requires a Fanger comfort model, which is a required brief
+    metric ("Thermal Comfort & Constraints", 20% of grading) but wasn't on
+    the stock People objects.
   - Adds Output:Variable requests for PMV and zone temps at Timestep
     resolution (stock file only requests hourly for some variables), plus a
     proper Output:Meter for Electricity:Facility (the stock file only had
@@ -78,23 +85,19 @@ def main():
         Hourly_Value=0.1,  # m/s, typical still indoor air
     )
 
-    # --- People + Fanger comfort model, one per zone ---
+    # --- Add Fanger comfort model to each zone's EXISTING People object ---
+    # (named "{zone} People 1" in the stock file, already wired to OCCUPY-1 /
+    # ActSchd -- extend it in place rather than adding a second object).
     for zone in ZONES:
-        idf.newidfobject(
-            "PEOPLE",
-            Name=f"{zone} People",
-            Zone_or_ZoneList_or_Space_or_SpaceList_Name=zone,
-            Number_of_People_Schedule_Name="OCCUPY-1",
-            Number_of_People_Calculation_Method="People",
-            Number_of_People=5,
-            Fraction_Radiant=0.3,
-            Activity_Level_Schedule_Name="ActSchd",
-            Work_Efficiency_Schedule_Name="Office Work Efficiency",
-            Clothing_Insulation_Calculation_Method="ClothingInsulationSchedule",
-            Clothing_Insulation_Schedule_Name="Office Clothing Insulation",
-            Air_Velocity_Schedule_Name="Office Air Velocity",
-            Thermal_Comfort_Model_1_Type="Fanger",
+        people = next(
+            o for o in idf.idfobjects["PEOPLE"]
+            if str(o.Name).casefold() == f"{zone} People 1".casefold()
         )
+        people.Work_Efficiency_Schedule_Name = "Office Work Efficiency"
+        people.Clothing_Insulation_Calculation_Method = "ClothingInsulationSchedule"
+        people.Clothing_Insulation_Schedule_Name = "Office Clothing Insulation"
+        people.Air_Velocity_Schedule_Name = "Office Air Velocity"
+        people.Thermal_Comfort_Model_1_Type = "Fanger"
 
     # --- Output requests needed for the dashboard / agent telemetry ---
     idf.newidfobject(

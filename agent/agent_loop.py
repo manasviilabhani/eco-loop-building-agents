@@ -29,14 +29,26 @@ from agent.shared_state import SimSnapshot, state
 
 MODEL = "qwen2.5:7b-instruct"
 MAX_TURNS = 4
-MAX_DIAGNOSE_TURNS = 5
+MAX_DIAGNOSE_TURNS = 6
 
 DIAGNOSE_SYSTEM_PROMPT = """You are diagnosing a failed EnergyPlus simulation run. You will be given the \
-tail of its .err log, which names the object type, object name, and field that caused a fatal error. \
+tail of its .err log, which names the object type, object name, and field that caused a fatal error.
+
+If the error is that a referenced schedule (or other named object) was not found, call \
+list_schedule_names first and reuse one of the REAL names it returns -- do not invent a \
+plausible-sounding name, it will not exist in the file and the fix will fail again just as badly.
+
 Call patch_idf_field with the exact object_type (as EnergyPlus IDD names it, e.g. "People", \
-"Schedule:Compact"), the object_name, the field_name to fix (Python attribute style, e.g. \
-"Number_of_People"), and a corrected new_value, saving to the given out_path. Make the smallest \
-targeted fix that addresses the specific error -- do not rewrite unrelated parts of the model. \
+"Schedule:Compact"), the object_name, the field_name to fix, and a corrected new_value, saving to \
+the given out_path. field_name must be the exact real IDF field name in Python-attribute style with \
+underscores (e.g. "Activity_Level_Schedule_Name", "Number_of_People") -- if patch_idf_field returns \
+an error listing valid fields, use the exact string from that list, do not guess a variation of it. \
+Make the smallest targeted fix that addresses the specific error -- do not rewrite unrelated parts \
+of the model. If the error says a value "Failed to match against any enum values" for a choice-type \
+field, do not guess variations of the value that was already tried -- that exact wording means the \
+field only accepts one of a small fixed set of valid keywords. For \
+"Thermal Comfort Model N Type" fields specifically, the valid values are exactly: Fanger, Pierce, \
+KSU, AdaptiveASH55, AdaptiveCEN15251, CoolingEffectASH55, AnkleDraftASH55 -- nothing else. \
 You MUST call patch_idf_field to finish; do not just describe the fix."""
 
 SYSTEM_PROMPT = """You are the control agent for a 5-zone commercial building's HVAC system, \
@@ -211,7 +223,9 @@ async def diagnose_and_patch_async(idf_path: str, err_tail: str, out_path: str) 
                 name = call["function"]["name"]
                 args = call["function"]["arguments"]
                 result = await session.call_tool(name, args)
-                messages.append({"role": "tool", "tool_name": name, "content": _tool_result_to_text(result)})
+                result_text = _tool_result_to_text(result)
+                print(f"[diagnose] tool={name} args={args} -> {result_text}", flush=True)
+                messages.append({"role": "tool", "tool_name": name, "content": result_text})
 
             if state.pending_patch.committed:
                 return {"ok": True, "out_path": state.pending_patch.out_path, "turns": turn + 1}

@@ -1979,7 +1979,17 @@ People,
     ,                         !- Floor Area per Person
     0.3,                      !- Fraction Radiant
     ,                         !- Sensible Heat Fraction
-    ActSchd;                  !- Activity Level Schedule Name
+    ActSchd,                  !- Activity Level Schedule Name
+    ,                         !- Carbon Dioxide Generation Rate
+    ,                         !- Enable ASHRAE 55 Comfort Warnings
+    ,                         !- Mean Radiant Temperature Calculation Type
+    ,                         !- Surface NameAngle Factor List Name
+    Office Work Efficiency,    !- Work Efficiency Schedule Name
+    ClothingInsulationSchedule,    !- Clothing Insulation Calculation Method
+    ,                         !- Clothing Insulation Calculation Method Schedule Name
+    Office Clothing Insulation,    !- Clothing Insulation Schedule Name
+    Office Air Velocity,      !- Air Velocity Schedule Name
+    Fanger;                   !- Thermal Comfort Model 1 Type
 
 People,
     SPACE2-1 People 1,        !- Name
@@ -1991,7 +2001,17 @@ People,
     ,                         !- Floor Area per Person
     0.3,                      !- Fraction Radiant
     ,                         !- Sensible Heat Fraction
-    ActSchd;                  !- Activity Level Schedule Name
+    Nonexistent Activity Schedule,    !- Activity Level Schedule Name
+    ,                         !- Carbon Dioxide Generation Rate
+    ,                         !- Enable ASHRAE 55 Comfort Warnings
+    ,                         !- Mean Radiant Temperature Calculation Type
+    ,                         !- Surface NameAngle Factor List Name
+    Office Work Efficiency,    !- Work Efficiency Schedule Name
+    ClothingInsulationSchedule,    !- Clothing Insulation Calculation Method
+    ,                         !- Clothing Insulation Calculation Method Schedule Name
+    Office Clothing Insulation,    !- Clothing Insulation Schedule Name
+    Office Air Velocity,      !- Air Velocity Schedule Name
+    Fanger;                   !- Thermal Comfort Model 1 Type
 
 People,
     SPACE3-1 People 1,        !- Name
@@ -2003,7 +2023,17 @@ People,
     ,                         !- Floor Area per Person
     0.3,                      !- Fraction Radiant
     ,                         !- Sensible Heat Fraction
-    ActSchd;                  !- Activity Level Schedule Name
+    ActSchd,                  !- Activity Level Schedule Name
+    ,                         !- Carbon Dioxide Generation Rate
+    ,                         !- Enable ASHRAE 55 Comfort Warnings
+    ,                         !- Mean Radiant Temperature Calculation Type
+    ,                         !- Surface NameAngle Factor List Name
+    Office Work Efficiency,    !- Work Efficiency Schedule Name
+    ClothingInsulationSchedule,    !- Clothing Insulation Calculation Method
+    ,                         !- Clothing Insulation Calculation Method Schedule Name
+    Office Clothing Insulation,    !- Clothing Insulation Schedule Name
+    Office Air Velocity,      !- Air Velocity Schedule Name
+    Fanger;                   !- Thermal Comfort Model 1 Type
 
 People,
     SPACE4-1 People 1,        !- Name
@@ -2015,7 +2045,17 @@ People,
     ,                         !- Floor Area per Person
     0.3,                      !- Fraction Radiant
     ,                         !- Sensible Heat Fraction
-    ActSchd;                  !- Activity Level Schedule Name
+    ActSchd,                  !- Activity Level Schedule Name
+    ,                         !- Carbon Dioxide Generation Rate
+    ,                         !- Enable ASHRAE 55 Comfort Warnings
+    ,                         !- Mean Radiant Temperature Calculation Type
+    ,                         !- Surface NameAngle Factor List Name
+    Office Work Efficiency,    !- Work Efficiency Schedule Name
+    ClothingInsulationSchedule,    !- Clothing Insulation Calculation Method
+    ,                         !- Clothing Insulation Calculation Method Schedule Name
+    Office Clothing Insulation,    !- Clothing Insulation Schedule Name
+    Office Air Velocity,      !- Air Velocity Schedule Name
+    Fanger;                   !- Thermal Comfort Model 1 Type
 
 People,
     SPACE5-1 People 1,        !- Name
@@ -2027,162 +2067,17 @@ People,
     ,                         !- Floor Area per Person
     0.3,                      !- Fraction Radiant
     ,                         !- Sensible Heat Fraction
-    ActSchd;                  !- Activity Level Schedule Name
-
-PEOPLE,
-    SPACE1-1 People,          !- Name
-    SPACE1-1,                 !- Zone or ZoneList or Space or SpaceList Name
-    OCCUPY-1,                 !- Number of People Schedule Name
-    People,                   !- Number of People Calculation Method
-    5,                        !- Number of People
-    ,                         !- People per Floor Area
-    ,                         !- Floor Area per Person
-    0.3,                      !- Fraction Radiant
-    autocalculate,            !- Sensible Heat Fraction
     ActSchd,                  !- Activity Level Schedule Name
-    3.82e-08,                 !- Carbon Dioxide Generation Rate
-    No,                       !- Enable ASHRAE 55 Comfort Warnings
-    EnclosureAveraged,        !- Mean Radiant Temperature Calculation Type
+    ,                         !- Carbon Dioxide Generation Rate
+    ,                         !- Enable ASHRAE 55 Comfort Warnings
+    ,                         !- Mean Radiant Temperature Calculation Type
     ,                         !- Surface NameAngle Factor List Name
     Office Work Efficiency,    !- Work Efficiency Schedule Name
     ClothingInsulationSchedule,    !- Clothing Insulation Calculation Method
     ,                         !- Clothing Insulation Calculation Method Schedule Name
     Office Clothing Insulation,    !- Clothing Insulation Schedule Name
     Office Air Velocity,      !- Air Velocity Schedule Name
-    Fanger,                   !- Thermal Comfort Model 1 Type
-    ,                         !- Thermal Comfort Model 2 Type
-    ,                         !- Thermal Comfort Model 3 Type
-    ,                         !- Thermal Comfort Model 4 Type
-    ,                         !- Thermal Comfort Model 5 Type
-    ,                         !- Thermal Comfort Model 6 Type
-    ,                         !- Thermal Comfort Model 7 Type
-    ,                         !- Ankle Level Air Velocity Schedule Name
-    15.56,                    !- Cold Stress Temperature Threshold
-    30;                       !- Heat Stress Temperature Threshold
-
-PEOPLE,
-    SPACE2-1 People,          !- Name
-    SPACE2-1,                 !- Zone or ZoneList or Space or SpaceList Name
-    OCCUPY-1,                 !- Number of People Schedule Name
-    People,                   !- Number of People Calculation Method
-    5,                        !- Number of People
-    ,                         !- People per Floor Area
-    ,                         !- Floor Area per Person
-    0.3,                      !- Fraction Radiant
-    autocalculate,            !- Sensible Heat Fraction
-    Nonexistent Activity Schedule,    !- Activity Level Schedule Name
-    3.82e-08,                 !- Carbon Dioxide Generation Rate
-    No,                       !- Enable ASHRAE 55 Comfort Warnings
-    EnclosureAveraged,        !- Mean Radiant Temperature Calculation Type
-    ,                         !- Surface NameAngle Factor List Name
-    Office Work Efficiency,    !- Work Efficiency Schedule Name
-    ClothingInsulationSchedule,    !- Clothing Insulation Calculation Method
-    ,                         !- Clothing Insulation Calculation Method Schedule Name
-    Office Clothing Insulation,    !- Clothing Insulation Schedule Name
-    Office Air Velocity,      !- Air Velocity Schedule Name
-    Fanger,                   !- Thermal Comfort Model 1 Type
-    ,                         !- Thermal Comfort Model 2 Type
-    ,                         !- Thermal Comfort Model 3 Type
-    ,                         !- Thermal Comfort Model 4 Type
-    ,                         !- Thermal Comfort Model 5 Type
-    ,                         !- Thermal Comfort Model 6 Type
-    ,                         !- Thermal Comfort Model 7 Type
-    ,                         !- Ankle Level Air Velocity Schedule Name
-    15.56,                    !- Cold Stress Temperature Threshold
-    30;                       !- Heat Stress Temperature Threshold
-
-PEOPLE,
-    SPACE3-1 People,          !- Name
-    SPACE3-1,                 !- Zone or ZoneList or Space or SpaceList Name
-    OCCUPY-1,                 !- Number of People Schedule Name
-    People,                   !- Number of People Calculation Method
-    5,                        !- Number of People
-    ,                         !- People per Floor Area
-    ,                         !- Floor Area per Person
-    0.3,                      !- Fraction Radiant
-    autocalculate,            !- Sensible Heat Fraction
-    ActSchd,                  !- Activity Level Schedule Name
-    3.82e-08,                 !- Carbon Dioxide Generation Rate
-    No,                       !- Enable ASHRAE 55 Comfort Warnings
-    EnclosureAveraged,        !- Mean Radiant Temperature Calculation Type
-    ,                         !- Surface NameAngle Factor List Name
-    Office Work Efficiency,    !- Work Efficiency Schedule Name
-    ClothingInsulationSchedule,    !- Clothing Insulation Calculation Method
-    ,                         !- Clothing Insulation Calculation Method Schedule Name
-    Office Clothing Insulation,    !- Clothing Insulation Schedule Name
-    Office Air Velocity,      !- Air Velocity Schedule Name
-    Fanger,                   !- Thermal Comfort Model 1 Type
-    ,                         !- Thermal Comfort Model 2 Type
-    ,                         !- Thermal Comfort Model 3 Type
-    ,                         !- Thermal Comfort Model 4 Type
-    ,                         !- Thermal Comfort Model 5 Type
-    ,                         !- Thermal Comfort Model 6 Type
-    ,                         !- Thermal Comfort Model 7 Type
-    ,                         !- Ankle Level Air Velocity Schedule Name
-    15.56,                    !- Cold Stress Temperature Threshold
-    30;                       !- Heat Stress Temperature Threshold
-
-PEOPLE,
-    SPACE4-1 People,          !- Name
-    SPACE4-1,                 !- Zone or ZoneList or Space or SpaceList Name
-    OCCUPY-1,                 !- Number of People Schedule Name
-    People,                   !- Number of People Calculation Method
-    5,                        !- Number of People
-    ,                         !- People per Floor Area
-    ,                         !- Floor Area per Person
-    0.3,                      !- Fraction Radiant
-    autocalculate,            !- Sensible Heat Fraction
-    ActSchd,                  !- Activity Level Schedule Name
-    3.82e-08,                 !- Carbon Dioxide Generation Rate
-    No,                       !- Enable ASHRAE 55 Comfort Warnings
-    EnclosureAveraged,        !- Mean Radiant Temperature Calculation Type
-    ,                         !- Surface NameAngle Factor List Name
-    Office Work Efficiency,    !- Work Efficiency Schedule Name
-    ClothingInsulationSchedule,    !- Clothing Insulation Calculation Method
-    ,                         !- Clothing Insulation Calculation Method Schedule Name
-    Office Clothing Insulation,    !- Clothing Insulation Schedule Name
-    Office Air Velocity,      !- Air Velocity Schedule Name
-    Fanger,                   !- Thermal Comfort Model 1 Type
-    ,                         !- Thermal Comfort Model 2 Type
-    ,                         !- Thermal Comfort Model 3 Type
-    ,                         !- Thermal Comfort Model 4 Type
-    ,                         !- Thermal Comfort Model 5 Type
-    ,                         !- Thermal Comfort Model 6 Type
-    ,                         !- Thermal Comfort Model 7 Type
-    ,                         !- Ankle Level Air Velocity Schedule Name
-    15.56,                    !- Cold Stress Temperature Threshold
-    30;                       !- Heat Stress Temperature Threshold
-
-PEOPLE,
-    SPACE5-1 People,          !- Name
-    SPACE5-1,                 !- Zone or ZoneList or Space or SpaceList Name
-    OCCUPY-1,                 !- Number of People Schedule Name
-    People,                   !- Number of People Calculation Method
-    5,                        !- Number of People
-    ,                         !- People per Floor Area
-    ,                         !- Floor Area per Person
-    0.3,                      !- Fraction Radiant
-    autocalculate,            !- Sensible Heat Fraction
-    ActSchd,                  !- Activity Level Schedule Name
-    3.82e-08,                 !- Carbon Dioxide Generation Rate
-    No,                       !- Enable ASHRAE 55 Comfort Warnings
-    EnclosureAveraged,        !- Mean Radiant Temperature Calculation Type
-    ,                         !- Surface NameAngle Factor List Name
-    Office Work Efficiency,    !- Work Efficiency Schedule Name
-    ClothingInsulationSchedule,    !- Clothing Insulation Calculation Method
-    ,                         !- Clothing Insulation Calculation Method Schedule Name
-    Office Clothing Insulation,    !- Clothing Insulation Schedule Name
-    Office Air Velocity,      !- Air Velocity Schedule Name
-    Fanger,                   !- Thermal Comfort Model 1 Type
-    ,                         !- Thermal Comfort Model 2 Type
-    ,                         !- Thermal Comfort Model 3 Type
-    ,                         !- Thermal Comfort Model 4 Type
-    ,                         !- Thermal Comfort Model 5 Type
-    ,                         !- Thermal Comfort Model 6 Type
-    ,                         !- Thermal Comfort Model 7 Type
-    ,                         !- Ankle Level Air Velocity Schedule Name
-    15.56,                    !- Cold Stress Temperature Threshold
-    30;                       !- Heat Stress Temperature Threshold
+    Fanger;                   !- Thermal Comfort Model 1 Type
 
 Lights,
     SPACE1-1 Lights 1,        !- Name
@@ -4160,6 +4055,11 @@ OUTPUT:VARIABLE,
 
 OUTPUT:VARIABLE,
     Htg-SetP-Sch,             !- Key Value
+    Schedule Value,           !- Variable Name
+    Timestep;                 !- Reporting Frequency
+
+OUTPUT:VARIABLE,
+    OCCUPY-1,                 !- Key Value
     Schedule Value,           !- Variable Name
     Timestep;                 !- Reporting Frequency
 

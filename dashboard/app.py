@@ -65,7 +65,7 @@ st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("Time series: zone comfort (PMV)")
 zone_choice = st.selectbox("Zone", ZONES)
-pmv_col = f"{zone_choice} PEOPLE:Zone Thermal Comfort Fanger Model PMV [](TimeStep)"
+pmv_col = f"{zone_choice} PEOPLE 1:Zone Thermal Comfort Fanger Model PMV [](TimeStep)"
 fig2 = go.Figure()
 fig2.add_trace(go.Scatter(y=baseline_df[pmv_col], name="Baseline", line=dict(color="#888")))
 fig2.add_trace(go.Scatter(y=ai_df[pmv_col], name="AI Closed-Loop", line=dict(color="#2ca02c")))

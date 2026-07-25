@@ -17,7 +17,7 @@ def make_bad_people_count():
     """Fault: negative occupant count on SPACE1-1 People object."""
     IDF.setiddname(str(EPLUS_DIR / "Energy+.idd"))
     idf = IDF(str(BASELINE_IDF))
-    people = next(o for o in idf.idfobjects["PEOPLE"] if o.Name == "SPACE1-1 People")
+    people = next(o for o in idf.idfobjects["PEOPLE"] if o.Name == "SPACE1-1 People 1")
     people.Number_of_People = -5
     idf.saveas(str(OUT_DIR / "broken_bad_people_count.idf"))
 
@@ -26,7 +26,7 @@ def make_dangling_schedule_ref():
     """Fault: People object references a schedule that doesn't exist."""
     IDF.setiddname(str(EPLUS_DIR / "Energy+.idd"))
     idf = IDF(str(BASELINE_IDF))
-    people = next(o for o in idf.idfobjects["PEOPLE"] if o.Name == "SPACE2-1 People")
+    people = next(o for o in idf.idfobjects["PEOPLE"] if o.Name == "SPACE2-1 People 1")
     people.Activity_Level_Schedule_Name = "Nonexistent Activity Schedule"
     idf.saveas(str(OUT_DIR / "broken_dangling_schedule.idf"))
 
@@ -35,7 +35,7 @@ def make_invalid_comfort_model():
     """Fault: invalid enum value for the Fanger comfort model field."""
     IDF.setiddname(str(EPLUS_DIR / "Energy+.idd"))
     idf = IDF(str(BASELINE_IDF))
-    people = next(o for o in idf.idfobjects["PEOPLE"] if o.Name == "SPACE3-1 People")
+    people = next(o for o in idf.idfobjects["PEOPLE"] if o.Name == "SPACE3-1 People 1")
     people.Thermal_Comfort_Model_1_Type = "Fangerz"
     idf.saveas(str(OUT_DIR / "broken_invalid_comfort_model.idf"))
 

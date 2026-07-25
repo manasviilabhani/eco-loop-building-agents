@@ -82,7 +82,7 @@ class EcoLoopController(EnergyPlusPlugin):
         for zone in ZONES:
             self.h[f"temp_{zone}"] = exch.get_variable_handle(state, "Zone Mean Air Temperature", zone)
             self.h[f"pmv_{zone}"] = exch.get_variable_handle(
-                state, "Zone Thermal Comfort Fanger Model PMV", f"{zone} PEOPLE"
+                state, "Zone Thermal Comfort Fanger Model PMV", f"{zone} PEOPLE 1"
             )
         self.h["facility_demand"] = exch.get_variable_handle(
             state, "Facility Total Electricity Demand Rate", "Whole Building"

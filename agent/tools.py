@@ -146,10 +146,32 @@ def get_error_log(err_path: str, max_lines: int = 60) -> dict:
 
 
 @mcp_app.tool()
+def list_schedule_names(idf_path: str) -> dict:
+    """List the names of every Schedule:Compact and Schedule:Constant object
+    already defined in the IDF. Use this before fixing a 'schedule not
+    found' error, so you reference a real existing schedule instead of
+    guessing a plausible-sounding name that may not exist."""
+    from eppy.modeleditor import IDF
+
+    if IDF.getiddname() is None:
+        IDF.setiddname("/Applications/EnergyPlus-26-1-0/Energy+.idd")
+    try:
+        idf = IDF(idf_path)
+        names = [o.Name for o in idf.idfobjects["SCHEDULE:COMPACT"]]
+        names += [o.Name for o in idf.idfobjects["SCHEDULE:CONSTANT"]]
+        return {"schedule_names": names}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+@mcp_app.tool()
 def patch_idf_field(idf_path: str, object_type: str, object_name: str, field_name: str, new_value: str, out_path: str) -> dict:
     """Apply a targeted field edit to an IDF object (identified by object
     type + name) and save the result as a new IDF file at out_path. Used to
-    autonomously fix a broken building model after a crashed run."""
+    autonomously fix a broken building model after a crashed run.
+    `field_name` must be one of the object's real field names (see the
+    error response for the valid list if you're unsure -- e.g. it is
+    "Activity_Level_Schedule_Name", not "ActivityLevelScheduleName")."""
     from eppy.modeleditor import IDF
 
     if IDF.getiddname() is None:
@@ -157,13 +179,40 @@ def patch_idf_field(idf_path: str, object_type: str, object_name: str, field_nam
 
     try:
         idf = IDF(idf_path)
-        matches = [
-            o for o in idf.idfobjects[object_type.upper()]
-            if getattr(o, "Name", None) == object_name
-        ]
+        objs = idf.idfobjects[object_type.upper()]
+
+        # Forgiving object_name match: EnergyPlus's own .err messages often
+        # upper-case/truncate names (e.g. "SPACE2-1 PEOPLE" or "SPACE2-1"
+        # for an object actually named "SPACE2-1 People"), and the model
+        # tends to echo that imprecise form back rather than the exact
+        # string. Try exact case-insensitive match first, then fall back to
+        # "requested name is a prefix of the real name", which is enough to
+        # disambiguate in a small building model.
+        target = object_name.casefold()
+        matches = [o for o in objs if str(getattr(o, "Name", "")).casefold() == target]
+        if not matches:
+            matches = [o for o in objs if str(getattr(o, "Name", "")).casefold().startswith(target)]
         if not matches:
             return {"error": f"no object of type {object_type} named {object_name} found"}
-        setattr(matches[0], field_name, new_value)
+        obj = matches[0]
+
+        # Forgiving field_name match: setattr on an eppy object silently
+        # accepts ANY attribute name -- it does NOT validate against real
+        # IDF fields, so a slightly-off field name (wrong case, missing
+        # underscores) would silently no-op instead of erroring, leaving the
+        # model with no signal that its fix didn't take effect. Normalize
+        # both sides (strip underscores/spaces, lowercase) before matching,
+        # rather than requiring the model to reproduce exact IDD casing.
+        def _norm(s: str) -> str:
+            return s.replace("_", "").replace(" ", "").casefold()
+
+        field_lookup = {_norm(f): f for f in obj.fieldnames}
+        real_field = field_lookup.get(_norm(field_name))
+        if real_field is None:
+            return {
+                "error": f"'{field_name}' is not a valid field on {object_type}. Valid fields: {obj.fieldnames}"
+            }
+        setattr(obj, real_field, new_value)
         idf.saveas(out_path)
         state.pending_patch.out_path = out_path
         state.pending_patch.committed = True
