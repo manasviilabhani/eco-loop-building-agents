@@ -1,0 +1,8 @@
+# Streamlit Community Cloud installs from the requirements.txt in the same
+# directory as the app entrypoint (dashboard/app.py) if one exists, in
+# preference to the repo-root one -- kept minimal on purpose: the dashboard
+# only reads static CSV/JSON output, it never touches EnergyPlus, Ollama, or
+# MCP, so it doesn't need those heavier dependencies.
+pandas>=2.2.0
+plotly>=5.24.0
+streamlit>=1.40.0
