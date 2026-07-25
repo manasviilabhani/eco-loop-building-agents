@@ -24,3 +24,11 @@ eplusmtr.*
 *.pkg
 
 .DS_Store
+
+# Exception: keep the final comparison run's time-series data, needed for
+# the hosted dashboard's charts (everything else under runs/ is regenerable
+# scratch output from intermediate debugging runs).
+!runs/baseline_full/
+!runs/baseline_full/eplusout.csv
+!runs/ai_closed_loop_full/
+!runs/ai_closed_loop_full/eplusout.csv
