@@ -2121,7 +2121,7 @@ PEOPLE,
     ,                         !- Clothing Insulation Calculation Method Schedule Name
     Office Clothing Insulation,    !- Clothing Insulation Schedule Name
     Office Air Velocity,      !- Air Velocity Schedule Name
-    Fanger,                   !- Thermal Comfort Model 1 Type
+    Fangerz,                  !- Thermal Comfort Model 1 Type
     ,                         !- Thermal Comfort Model 2 Type
     ,                         !- Thermal Comfort Model 3 Type
     ,                         !- Thermal Comfort Model 4 Type

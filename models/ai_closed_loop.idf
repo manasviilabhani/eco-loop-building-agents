@@ -4283,3 +4283,16 @@ Meter:CustomDecrement,
     Electricity:Building,     !- Source Meter Name
     ,                         !- Key Name 1
     MyGeneralLights;          !- Output Variable or Meter Name 1
+
+PYTHONPLUGIN:SEARCHPATHS,
+    Eco Loop Search Paths,    !- Name
+    Yes,                      !- Add Current Working Directory to Search Path
+    Yes,                      !- Add Input File Directory to Search Path
+    Yes,                      !- Add epin Environment Variable to Search Path
+    /Users/manasvilabhani/eco-loop-building-agents/plugin;    !- Search Path 1
+
+PYTHONPLUGIN:INSTANCE,
+    Eco Loop Controller Instance,    !- Name
+    No,                       !- Run During Warmup Days
+    eco_loop_plugin,          !- Python Module Name
+    EcoLoopController;        !- Plugin Class Name

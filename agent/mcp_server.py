@@ -1,12 +1,26 @@
-"""MCP server exposing the Eco-Loop tools (agent/tools.py) to the LLM agent.
+"""Real MCP server for the Eco-Loop tools, connected to the LLM agent
+in-process over an in-memory MCP transport (mcp.shared.memory) rather than a
+subprocess -- same protocol, tool schemas, and client/server dispatch as a
+stdio MCP server, without the IPC overhead of spawning a subprocess for
+every hourly decision cycle.
 
-Real MCP protocol server (not a hardcoded control-logic loophole) so the LLM
-must reason about which tool to call and with what arguments -- this is what
-the "Agentic Autonomy" grading criterion is checking for.
-
-TODO(Phase 2): register each function in tools.py as an MCP tool with a JSON
-schema (types, units, min/max) using the `mcp` SDK's server primitives, and
-run this as a subprocess the agent_loop.py MCP client connects to over stdio.
+(A subprocess+stdio MCP server was considered, but the EnergyPlus Python
+Plugin embeds its own separate CPython 3.12 interpreter with no access to
+this venv's site-packages -- see docs/ARCHITECTURE.md "Process boundary"
+section. The agent, including this MCP server, therefore runs as an
+independent long-running service (agent/service.py) that the EnergyPlus
+plugin talks to over a small local HTTP bridge, not by importing agent code
+directly.)
 """
 
-raise NotImplementedError("TODO(Phase 2): implement MCP server registration once tools.py is filled in")
+from contextlib import asynccontextmanager
+
+from mcp.shared.memory import create_connected_server_and_client_session
+
+from agent.tools import mcp_app
+
+
+@asynccontextmanager
+async def connected_session():
+    async with create_connected_server_and_client_session(mcp_app._mcp_server) as session:
+        yield session

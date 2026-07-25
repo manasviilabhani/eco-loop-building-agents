@@ -1,54 +1,175 @@
-"""EnergyPlus Python Plugin: the in-simulation hook for the Eco-Loop closed loop.
+"""EnergyPlus Python Plugin: the in-simulation hook for the Eco-Loop closed
+loop. Runs inside EnergyPlus's own embedded interpreter (stdlib only -- no
+third-party packages available here, see docs/ARCHITECTURE.md). Talks to the
+LLM agent (agent/service.py) over a local HTTP bridge.
 
-Runs inside the live EnergyPlus process. On a fixed decision cadence (default:
-once per simulated hour, not every zone timestep) it:
-  1. Reads sensor state via the Exchange API (zone mean air temp, PMV, facility
-     electricity, outdoor conditions).
-  2. Hands a compact JSON snapshot to the agent (agent/agent_loop.py).
-  3. Writes the agent's returned setpoint back via the Actuator API
-     (Forward Injection) -- server-side clamped to a safe range regardless of
-     what the agent returns.
-  4. If the agent call fails/times out, holds the last known-good setpoint so
-     the simulation never stalls or crashes because the model was slow.
-
-This file is intentionally thin: all reasoning lives in agent/agent_loop.py so
-the plugin stays a dumb, reliable I/O boundary.
+Each simulated hour (on the hour):
+  1. Reads sensor state via the Exchange API (zone mean air temp, PMV per
+     zone, facility electricity demand, current setpoints).
+  2. POSTs a compact JSON snapshot to the agent service.
+  3. On a successful response, clamps (defense in depth -- the agent service
+     already clamps too) and writes the new cooling/heating setpoints back
+     via the Actuator API onto the Clg-SetP-Sch / Htg-SetP-Sch Schedule:Compact
+     objects -- this is live, mid-simulation Forward Injection: all 5 zones
+     share these two schedules, so one decision affects the whole building.
+  4. On any failure (HTTP error, timeout, malformed response, agent
+     couldn't commit a decision), holds the last known-good setpoints and
+     logs a warning -- the simulation must never crash because the agent
+     was slow or wrong.
 """
+
+import json
+import urllib.request
+import urllib.error
 
 from pyenergyplus.plugin import EnergyPlusPlugin
 
-DECISION_CADENCE_MINUTES = 60  # call the agent once per simulated hour
-SETPOINT_MIN_C = 18.0
+AGENT_URL = "http://127.0.0.1:8765/decide"
+HTTP_TIMEOUT_SECONDS = 30
+DECISION_CADENCE_MINUTES = 60
+
+SETPOINT_MIN_C = 20.0
 SETPOINT_MAX_C = 28.0
+MIN_DEADBAND_C = 2.0
+
+ZONES = ["SPACE1-1", "SPACE2-1", "SPACE3-1", "SPACE4-1", "SPACE5-1"]
 
 
-class EcoLoopPlugin(EnergyPlusPlugin):
+def _clamp_pair(cooling_c: float, heating_c: float) -> tuple[float, float]:
+    """Final backstop clamp, independent of whatever the agent service
+    already did -- the plugin must never trust an upstream HTTP response
+    enough to actuate a value that could crash the simulation
+    (DualSetPointWithDeadBand fires fatally if heating >= cooling)."""
+    cooling = max(SETPOINT_MIN_C, min(SETPOINT_MAX_C, cooling_c))
+    heating = max(SETPOINT_MIN_C, min(SETPOINT_MAX_C, heating_c))
+    if heating > cooling - MIN_DEADBAND_C:
+        heating = cooling - MIN_DEADBAND_C
+    return cooling, heating
+
+
+def _synthetic_carbon_intensity(hour: int) -> float:
+    """Stand-in grid carbon-intensity curve (0-1): higher during the
+    afternoon peak-demand window, lower overnight. A real deployment would
+    pull this from a grid API (e.g. WattTime/electricityMap); documented as
+    synthetic in docs/ARCHITECTURE.md."""
+    if 13 <= hour <= 18:
+        return 0.8
+    if 6 <= hour <= 12 or 19 <= hour <= 21:
+        return 0.5
+    return 0.2
+
+
+class EcoLoopController(EnergyPlusPlugin):
     def __init__(self):
         super().__init__()
         self.handles_initialized = False
-        self.last_decision_minute = None
-        self.last_good_setpoint = None
-        # Sensor/actuator handles resolved lazily on first callback, once the
-        # API guarantees the data exchange is ready.
-        self.h_zone_temp = None
-        self.h_pmv = None
-        self.h_facility_electricity = None
-        self.h_setpoint_actuator = None
+        self.last_decision_hour_key = None
+        self.last_good_cooling_c = None
+        self.last_good_heating_c = None
+
+        self.h = {}  # sensor/actuator handles, keyed by name
 
     def _init_handles(self, state):
-        raise NotImplementedError(
-            "TODO(Phase 2): resolve handles via self.api.exchange.get_variable_handle / "
-            "get_actuator_handle once the target IDF's exact object/zone names are known "
-            "(depends on final baseline.idf chosen in Phase 1)."
+        exch = self.api.exchange
+        for zone in ZONES:
+            self.h[f"temp_{zone}"] = exch.get_variable_handle(state, "Zone Mean Air Temperature", zone)
+            self.h[f"pmv_{zone}"] = exch.get_variable_handle(
+                state, "Zone Thermal Comfort Fanger Model PMV", f"{zone} PEOPLE"
+            )
+        self.h["facility_demand"] = exch.get_variable_handle(
+            state, "Facility Total Electricity Demand Rate", "Whole Building"
+        )
+        self.h["cooling_setpoint_sensor"] = exch.get_variable_handle(state, "Schedule Value", "Clg-SetP-Sch")
+        self.h["heating_setpoint_sensor"] = exch.get_variable_handle(state, "Schedule Value", "Htg-SetP-Sch")
+
+        self.h["cooling_actuator"] = exch.get_actuator_handle(
+            state, "Schedule:Compact", "Schedule Value", "Clg-SetP-Sch"
+        )
+        self.h["heating_actuator"] = exch.get_actuator_handle(
+            state, "Schedule:Compact", "Schedule Value", "Htg-SetP-Sch"
         )
 
-    def on_end_of_zone_timestep_after_zone_reporting(self, state) -> int:
+        if any(v == -1 for v in self.h.values()):
+            missing = [k for k, v in self.h.items() if v == -1]
+            self.api.runtime.issue_severe(state, f"EcoLoopController: failed to resolve handles: {missing}")
+
+        self.handles_initialized = True
+
+    def _build_snapshot(self, state) -> dict:
+        exch = self.api.exchange
+        zones = {}
+        for zone in ZONES:
+            zones[zone] = {
+                "temp_c": exch.get_variable_value(state, self.h[f"temp_{zone}"]),
+                "pmv": exch.get_variable_value(state, self.h[f"pmv_{zone}"]),
+            }
+        hour = exch.hour(state)
+        return {
+            "sim_time": f"{exch.month(state):02d}-{exch.day_of_month(state):02d} {hour:02d}:00",
+            "zones": zones,
+            "facility_demand_w": exch.get_variable_value(state, self.h["facility_demand"]),
+            "cooling_setpoint_c": exch.get_variable_value(state, self.h["cooling_setpoint_sensor"]),
+            "heating_setpoint_c": exch.get_variable_value(state, self.h["heating_setpoint_sensor"]),
+            "carbon_intensity": _synthetic_carbon_intensity(hour),
+        }
+
+    def _call_agent(self, snapshot: dict) -> dict:
+        data = json.dumps(snapshot).encode("utf-8")
+        req = urllib.request.Request(
+            AGENT_URL, data=data, headers={"Content-Type": "application/json"}, method="POST"
+        )
+        with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT_SECONDS) as resp:
+            return json.loads(resp.read())
+
+    def _apply_setpoints(self, state, cooling_c: float, heating_c: float):
+        exch = self.api.exchange
+        cooling_c, heating_c = _clamp_pair(cooling_c, heating_c)
+        exch.set_actuator_value(state, self.h["cooling_actuator"], cooling_c)
+        exch.set_actuator_value(state, self.h["heating_actuator"], heating_c)
+        self.last_good_cooling_c = cooling_c
+        self.last_good_heating_c = heating_c
+
+    def on_begin_timestep_before_predictor(self, state) -> int:
+        if self.api.exchange.warmup_flag(state):
+            return 0
+        # EnergyPlus also runs internal sizing/load-component-report passes
+        # (design days) outside the real weather-file RunPeriod; the agent
+        # should only act on the actual comparison period, not sizing calcs.
+        # KindOfSim == 3 is EnergyPlus's RunPeriodWeather.
+        if self.api.exchange.kind_of_sim(state) != 3:
+            return 0
+
         if not self.handles_initialized:
             self._init_handles(state)
-            self.handles_initialized = True
 
-        raise NotImplementedError(
-            "TODO(Phase 2): read sensors, gate on DECISION_CADENCE_MINUTES, call the "
-            "agent, clamp+apply the returned setpoint via set_actuator_value, and fall "
-            "back to self.last_good_setpoint on any agent error/timeout."
-        )
+        exch = self.api.exchange
+        hour = exch.hour(state)
+        day_key = (exch.day_of_month(state), hour)
+
+        # Cadence gate: fire at most once per calendar hour (the first zone
+        # timestep observed within that hour), matching DECISION_CADENCE_MINUTES.
+        if day_key == self.last_decision_hour_key:
+            if self.last_good_cooling_c is not None:
+                self._apply_setpoints(state, self.last_good_cooling_c, self.last_good_heating_c)
+            return 0
+        self.last_decision_hour_key = day_key
+
+        snapshot = self._build_snapshot(state)
+
+        try:
+            result = self._call_agent(snapshot)
+        except (urllib.error.URLError, TimeoutError, OSError, ValueError) as e:
+            self.api.runtime.issue_warning(state, f"EcoLoopController: agent call failed ({e}), holding last setpoints")
+            result = {"ok": False}
+
+        if result.get("ok"):
+            self._apply_setpoints(state, result["cooling_setpoint_c"], result["heating_setpoint_c"])
+        elif self.last_good_cooling_c is not None:
+            self.api.runtime.issue_warning(state, "EcoLoopController: agent did not return a decision, holding last setpoints")
+            self._apply_setpoints(state, self.last_good_cooling_c, self.last_good_heating_c)
+        else:
+            self.api.runtime.issue_warning(
+                state, "EcoLoopController: no agent decision and no prior setpoint to hold; leaving schedule un-actuated"
+            )
+
+        return 0

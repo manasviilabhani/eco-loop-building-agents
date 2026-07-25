@@ -121,6 +121,21 @@ def main():
         Key_Name="Electricity:Facility",
         Reporting_Frequency="Timestep",
     )
+    # Needed so the closed-loop plugin can read the current setpoint via
+    # get_variable_handle -- schedule value sensors only resolve if an
+    # Output:Variable request for that exact key exists somewhere in the IDF.
+    idf.newidfobject(
+        "OUTPUT:VARIABLE",
+        Key_Value="Clg-SetP-Sch",
+        Variable_Name="Schedule Value",
+        Reporting_Frequency="Timestep",
+    )
+    idf.newidfobject(
+        "OUTPUT:VARIABLE",
+        Key_Value="Htg-SetP-Sch",
+        Variable_Name="Schedule Value",
+        Reporting_Frequency="Timestep",
+    )
 
     idf.saveas(str(OUT_IDF))
     print(f"Wrote {OUT_IDF}")

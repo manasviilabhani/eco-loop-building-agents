@@ -2080,7 +2080,7 @@ PEOPLE,
     ,                         !- Floor Area per Person
     0.3,                      !- Fraction Radiant
     autocalculate,            !- Sensible Heat Fraction
-    Office Activity Level,    !- Activity Level Schedule Name
+    Nonexistent Activity Schedule,    !- Activity Level Schedule Name
     3.82e-08,                 !- Carbon Dioxide Generation Rate
     No,                       !- Enable ASHRAE 55 Comfort Warnings
     EnclosureAveraged,        !- Mean Radiant Temperature Calculation Type

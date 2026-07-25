@@ -3,13 +3,13 @@
   <BuildingName>Simple One Zone (Wireframe DXF)</BuildingName>
   <EnvironmentName>RUN PERIOD 1</EnvironmentName>
   <WeatherFileLocationTitle>Chicago Ohare Intl Ap IL USA TMY3 WMO#=725300</WeatherFileLocationTitle>
-  <ProgramVersion>EnergyPlus, Version 26.1.0-6f2e40d102, YMD=2026.07.25 17:11</ProgramVersion>
+  <ProgramVersion>EnergyPlus, Version 26.1.0-6f2e40d102, YMD=2026.07.25 17:28</ProgramVersion>
   <SimulationTimestamp>
     <Date>
       2026-07-25
     </Date>
     <Time>
-      17:11:41
+      17:28:57
     </Time>
   </SimulationTimestamp>
 
@@ -1053,7 +1053,7 @@
   <for>Entire Facility</for>
   <General>
     <name>Value</name>
-    <ProgramVersionAndBuild>EnergyPlus, Version 26.1.0-6f2e40d102, YMD=2026.07.25 17:11</ProgramVersionAndBuild>
+    <ProgramVersionAndBuild>EnergyPlus, Version 26.1.0-6f2e40d102, YMD=2026.07.25 17:28</ProgramVersionAndBuild>
     <Runperiod>RUN PERIOD 1</Runperiod>
     <WeatherFile>Chicago Ohare Intl Ap IL USA TMY3 WMO#=725300</WeatherFile>
     <Latitude units="deg">
@@ -4060,9 +4060,9 @@
   </Hvac>
   <InputFields>
     <name>Count</name>
-    <IdfObjects>56</IdfObjects>
+    <IdfObjects>58</IdfObjects>
     <DefaultedFields>28</DefaultedFields>
-    <FieldsWithDefaults>168</FieldsWithDefaults>
+    <FieldsWithDefaults>172</FieldsWithDefaults>
     <AutosizedFields>0</AutosizedFields>
     <AutosizableFields>0</AutosizableFields>
     <AutocalculatedFields>3</AutocalculatedFields>

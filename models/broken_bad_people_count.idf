@@ -2044,7 +2044,7 @@ PEOPLE,
     SPACE1-1,                 !- Zone or ZoneList or Space or SpaceList Name
     Always Occupied,          !- Number of People Schedule Name
     People,                   !- Number of People Calculation Method
-    5,                        !- Number of People
+    -5,                       !- Number of People
     ,                         !- People per Floor Area
     ,                         !- Floor Area per Person
     0.3,                      !- Fraction Radiant
