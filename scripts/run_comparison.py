@@ -40,14 +40,20 @@ def summarize(out_dir: Path) -> dict:
     pmv_cols = [f"{z} PEOPLE:Zone Thermal Comfort Fanger Model PMV [](TimeStep)" for z in zones]
     demand_col = "Whole Building:Facility Total Electricity Demand Rate [W](TimeStep)"
     elec_col = "Electricity:Facility [J](TimeStep)"
+    occupied_col = "OCCUPY-1:Schedule Value [](TimeStep)"
 
     total_kwh = df[elec_col].sum() / 3.6e6
     peak_demand_w = df[demand_col].max()
 
+    # Comfort only matters when someone is actually there to feel it --
+    # EnergyPlus reports a PMV value even at zero occupancy (driven by the
+    # constant clothing/activity schedules), so unfiltered PMV counts would
+    # score an empty building's temperature drift as a "comfort violation".
+    occupied = df[occupied_col] > 0
     violations = 0
     total_readings = 0
     for c in pmv_cols:
-        pmv = df[c]
+        pmv = df.loc[occupied, c]
         violations += int(((pmv < PMV_LO) | (pmv > PMV_HI)).sum())
         total_readings += len(pmv)
 

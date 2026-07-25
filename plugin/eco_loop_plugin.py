@@ -28,18 +28,26 @@ AGENT_URL = "http://127.0.0.1:8765/decide"
 HTTP_TIMEOUT_SECONDS = 30
 DECISION_CADENCE_MINUTES = 60
 
-SETPOINT_MIN_C = 20.0
-SETPOINT_MAX_C = 28.0
+SETPOINT_MIN_C = 22.0  # narrow occupied-hours safety envelope, see agent/tools.py
+SETPOINT_MAX_C = 26.0
 MIN_DEADBAND_C = 2.0
+MAX_STEP_C = 0.5
 
 ZONES = ["SPACE1-1", "SPACE2-1", "SPACE3-1", "SPACE4-1", "SPACE5-1"]
 
 
-def _clamp_pair(cooling_c: float, heating_c: float) -> tuple[float, float]:
+def _clamp_pair(cooling_c: float, heating_c: float, last_cooling_c: float | None, last_heating_c: float | None) -> tuple[float, float]:
     """Final backstop clamp, independent of whatever the agent service
     already did -- the plugin must never trust an upstream HTTP response
     enough to actuate a value that could crash the simulation
-    (DualSetPointWithDeadBand fires fatally if heating >= cooling)."""
+    (DualSetPointWithDeadBand fires fatally if heating >= cooling), or one
+    that swings several degrees in a single cycle and overshoots the comfort
+    band the other way (an early prompt-only version of the closed loop did
+    exactly this -- see docs/ARCHITECTURE.md)."""
+    if last_cooling_c is not None:
+        cooling_c = last_cooling_c + max(-MAX_STEP_C, min(MAX_STEP_C, cooling_c - last_cooling_c))
+    if last_heating_c is not None:
+        heating_c = last_heating_c + max(-MAX_STEP_C, min(MAX_STEP_C, heating_c - last_heating_c))
     cooling = max(SETPOINT_MIN_C, min(SETPOINT_MAX_C, cooling_c))
     heating = max(SETPOINT_MIN_C, min(SETPOINT_MAX_C, heating_c))
     if heating > cooling - MIN_DEADBAND_C:
@@ -123,7 +131,7 @@ class EcoLoopController(EnergyPlusPlugin):
 
     def _apply_setpoints(self, state, cooling_c: float, heating_c: float):
         exch = self.api.exchange
-        cooling_c, heating_c = _clamp_pair(cooling_c, heating_c)
+        cooling_c, heating_c = _clamp_pair(cooling_c, heating_c, self.last_good_cooling_c, self.last_good_heating_c)
         exch.set_actuator_value(state, self.h["cooling_actuator"], cooling_c)
         exch.set_actuator_value(state, self.h["heating_actuator"], heating_c)
         self.last_good_cooling_c = cooling_c

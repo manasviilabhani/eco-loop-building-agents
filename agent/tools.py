@@ -6,15 +6,25 @@ POST before starting an agent decision turn.
 set_hvac_setpoints is the only tool that produces a real control action; it
 is clamped server-side here as a safety backstop independent of whatever the
 LLM requests (the brief explicitly grades "self-correction" and robustness).
+
+The [22C, 26C] range is a deliberately narrow occupied-hours safety envelope,
+not just a physical sanity bound -- an early version allowed the full
+[20C, 28C] range and the agent (even with a per-cycle rate limit) could still
+drift monotonically to an extreme over many cycles if its directional
+judgment was even slightly biased, overshooting comfort. A real facility
+engineer would similarly configure a tight envelope around the building's
+known-reasonable setpoint (23.9C in the original schedule) rather than
+trusting any single automation layer with the full range.
 """
 
 from mcp.server.fastmcp import FastMCP
 
 from agent.shared_state import state
 
-SETPOINT_MIN_C = 20.0
-SETPOINT_MAX_C = 28.0
+SETPOINT_MIN_C = 22.0
+SETPOINT_MAX_C = 26.0
 MIN_DEADBAND_C = 2.0  # heating setpoint must stay at least this far below cooling setpoint
+MAX_STEP_C = 0.5  # max change from the current setpoint allowed per decision cycle
 PMV_COMFORT_BAND = (-0.5, 0.5)
 
 mcp_app = FastMCP("eco-loop-tools")
@@ -25,17 +35,39 @@ def clamp_setpoint(value_c: float) -> tuple[float, bool]:
     return clamped, clamped != value_c
 
 
+def _rate_limit(requested_c: float, current_c: float | None) -> float:
+    """Caps the change from the current setpoint to MAX_STEP_C per decision
+    cycle. An early prompt-only version of this constraint ("make small
+    incremental adjustments") was not reliable enough on its own: the model
+    still occasionally jumped several degrees in one cycle and overshot the
+    comfort band the other way. Enforcing the step size server-side, not
+    just describing it in the prompt, is what actually holds it."""
+    if current_c is None:
+        return requested_c
+    delta = max(-MAX_STEP_C, min(MAX_STEP_C, requested_c - current_c))
+    return current_c + delta
+
+
 def clamp_setpoint_pair(cooling_c: float, heating_c: float) -> tuple[float, float, bool]:
-    """Clamps each to the safe range, then enforces a minimum heating/cooling
-    deadband -- EnergyPlus fatally errors (DualSetPointWithDeadBand) if the
-    effective heating setpoint is ever >= the cooling setpoint, and an LLM is
-    not guaranteed to respect that physical constraint on its own."""
-    cooling, cool_clamped = clamp_setpoint(cooling_c)
-    heating, heat_clamped = clamp_setpoint(heating_c)
+    """Rate-limits each from the current setpoint, clamps each to the safe
+    range, then enforces a minimum heating/cooling deadband -- EnergyPlus
+    fatally errors (DualSetPointWithDeadBand) if the effective heating
+    setpoint is ever >= the cooling setpoint, and an LLM is not guaranteed to
+    respect that physical constraint on its own."""
+    snap = state.snapshot
+    current_cool = snap.cooling_setpoint_c if snap else None
+    current_heat = snap.heating_setpoint_c if snap else None
+
+    limited_cool = _rate_limit(cooling_c, current_cool)
+    limited_heat = _rate_limit(heating_c, current_heat)
+
+    cooling, cool_clamped = clamp_setpoint(limited_cool)
+    heating, heat_clamped = clamp_setpoint(limited_heat)
     if heating > cooling - MIN_DEADBAND_C:
         heating = cooling - MIN_DEADBAND_C
         heat_clamped = True
-    return cooling, heating, (cool_clamped or heat_clamped)
+    was_limited = (limited_cool != cooling_c) or (limited_heat != heating_c)
+    return cooling, heating, (cool_clamped or heat_clamped or was_limited)
 
 
 @mcp_app.tool()

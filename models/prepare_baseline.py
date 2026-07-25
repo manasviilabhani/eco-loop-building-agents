@@ -48,18 +48,17 @@ def main():
     # NOTE: "Fraction" ScheduleTypeLimits already exists in the source file --
     # do not redefine it (EnergyPlus treats a second definition as fatal, not
     # a harmless override).
-    idf.newidfobject(
-        "SCHEDULE:CONSTANT",
-        Name="Always Occupied",
-        Schedule_Type_Limits_Name="Fraction",
-        Hourly_Value=1.0,
-    )
-    idf.newidfobject(
-        "SCHEDULE:CONSTANT",
-        Name="Office Activity Level",
-        Schedule_Type_Limits_Name="",
-        Hourly_Value=120.0,  # W/person, typical seated office work
-    )
+    # NOTE: reuse the source file's own "OCCUPY-1" (weekday 8am-7pm
+    # occupancy fraction) and "ActSchd" (117.24 W activity level) schedules
+    # instead of inventing an "always occupied" one -- an earlier version of
+    # this script used a constant-1.0 occupancy schedule, which meant PMV
+    # comfort was being enforced 24/7, including empty overnight hours when
+    # the building's own setpoint schedule (Clg-SetP-Sch) intentionally lets
+    # temperature drift wide (29.4C setback) to save energy. That mismatch
+    # made the baseline's PMV violation rate look artificially bad and gave
+    # the agent an incentive to fight the setback schedule at night for no
+    # real comfort benefit (nobody's there) -- it made both energy and
+    # comfort worse. Tying comfort tracking to real occupancy fixes both.
     idf.newidfobject(
         "SCHEDULE:CONSTANT",
         Name="Office Work Efficiency",
@@ -85,11 +84,11 @@ def main():
             "PEOPLE",
             Name=f"{zone} People",
             Zone_or_ZoneList_or_Space_or_SpaceList_Name=zone,
-            Number_of_People_Schedule_Name="Always Occupied",
+            Number_of_People_Schedule_Name="OCCUPY-1",
             Number_of_People_Calculation_Method="People",
             Number_of_People=5,
             Fraction_Radiant=0.3,
-            Activity_Level_Schedule_Name="Office Activity Level",
+            Activity_Level_Schedule_Name="ActSchd",
             Work_Efficiency_Schedule_Name="Office Work Efficiency",
             Clothing_Insulation_Calculation_Method="ClothingInsulationSchedule",
             Clothing_Insulation_Schedule_Name="Office Clothing Insulation",
@@ -133,6 +132,16 @@ def main():
     idf.newidfobject(
         "OUTPUT:VARIABLE",
         Key_Value="Htg-SetP-Sch",
+        Variable_Name="Schedule Value",
+        Reporting_Frequency="Timestep",
+    )
+    # Needed to filter PMV comfort violations to actually-occupied hours --
+    # EnergyPlus computes PMV from the (constant) clothing/activity schedules
+    # regardless of occupancy fraction, so an empty zone still gets a PMV
+    # value; comfort is only meaningful when someone is there to feel it.
+    idf.newidfobject(
+        "OUTPUT:VARIABLE",
+        Key_Value="OCCUPY-1",
         Variable_Name="Schedule Value",
         Reporting_Frequency="Timestep",
     )

@@ -157,6 +157,29 @@ with `Number_of_People = "-5" - Expected number greater than or equal to
 value, and the patched IDF runs cleanly on the very next attempt (2 attempts
 total, 5 tool-calling turns).
 
+## Debugging note: occupancy-gated comfort scoring
+
+An early full-week comparison run showed the AI closed-loop doing *worse*
+than baseline on both energy (+4.1%) and comfort (31.8% vs 27.1% PMV
+violations). Root cause: `models/baseline.idf`'s People objects originally
+used a constant "always occupied" schedule. EnergyPlus computes PMV from the
+clothing/activity schedules regardless of actual headcount, so PMV gets
+reported 24/7 even in an empty building overnight -- and with a constant
+occupancy schedule, the added internal heat gain kept zones artificially
+warm overnight, masking how bad the unfiltered PMV metric actually was.
+Switching to the source file's own realistic `OCCUPY-1` schedule (weekday
+8am-7pm) initially made the *measured* violation rate look worse (50.3%),
+because now overnight zones properly cooled per the setback schedule while
+PMV was still being scored against a hypothetical occupant who isn't there.
+
+The actual fix was scoring comfort only during occupied hours
+(`scripts/run_comparison.py::summarize`, filtered on a new `OCCUPY-1`
+`Output:Variable`) -- comfort is only meaningful when someone can feel it.
+That took the baseline's occupied-hours violation rate to a realistic 2.5%,
+which is the number the AI closed-loop is actually being compared against.
+This fix changes how *both* runs are scored equally; it does not favor
+either one.
+
 ## Honest tradeoffs
 
 - The grid carbon-intensity signal is **synthetic** (`plugin/eco_loop_plugin.py::

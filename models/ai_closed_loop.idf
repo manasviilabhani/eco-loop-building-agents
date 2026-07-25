@@ -501,16 +501,6 @@ Schedule:Compact,
     4.5;                      !- Field 4
 
 SCHEDULE:CONSTANT,
-    Always Occupied,          !- Name
-    Fraction,                 !- Schedule Type Limits Name
-    1;                        !- Hourly Value
-
-SCHEDULE:CONSTANT,
-    Office Activity Level,    !- Name
-    ,                         !- Schedule Type Limits Name
-    120;                      !- Hourly Value
-
-SCHEDULE:CONSTANT,
     Office Work Efficiency,    !- Name
     ,                         !- Schedule Type Limits Name
     0;                        !- Hourly Value
@@ -2042,14 +2032,14 @@ People,
 PEOPLE,
     SPACE1-1 People,          !- Name
     SPACE1-1,                 !- Zone or ZoneList or Space or SpaceList Name
-    Always Occupied,          !- Number of People Schedule Name
+    OCCUPY-1,                 !- Number of People Schedule Name
     People,                   !- Number of People Calculation Method
     5,                        !- Number of People
     ,                         !- People per Floor Area
     ,                         !- Floor Area per Person
     0.3,                      !- Fraction Radiant
     autocalculate,            !- Sensible Heat Fraction
-    Office Activity Level,    !- Activity Level Schedule Name
+    ActSchd,                  !- Activity Level Schedule Name
     3.82e-08,                 !- Carbon Dioxide Generation Rate
     No,                       !- Enable ASHRAE 55 Comfort Warnings
     EnclosureAveraged,        !- Mean Radiant Temperature Calculation Type
@@ -2073,14 +2063,14 @@ PEOPLE,
 PEOPLE,
     SPACE2-1 People,          !- Name
     SPACE2-1,                 !- Zone or ZoneList or Space or SpaceList Name
-    Always Occupied,          !- Number of People Schedule Name
+    OCCUPY-1,                 !- Number of People Schedule Name
     People,                   !- Number of People Calculation Method
     5,                        !- Number of People
     ,                         !- People per Floor Area
     ,                         !- Floor Area per Person
     0.3,                      !- Fraction Radiant
     autocalculate,            !- Sensible Heat Fraction
-    Office Activity Level,    !- Activity Level Schedule Name
+    ActSchd,                  !- Activity Level Schedule Name
     3.82e-08,                 !- Carbon Dioxide Generation Rate
     No,                       !- Enable ASHRAE 55 Comfort Warnings
     EnclosureAveraged,        !- Mean Radiant Temperature Calculation Type
@@ -2104,14 +2094,14 @@ PEOPLE,
 PEOPLE,
     SPACE3-1 People,          !- Name
     SPACE3-1,                 !- Zone or ZoneList or Space or SpaceList Name
-    Always Occupied,          !- Number of People Schedule Name
+    OCCUPY-1,                 !- Number of People Schedule Name
     People,                   !- Number of People Calculation Method
     5,                        !- Number of People
     ,                         !- People per Floor Area
     ,                         !- Floor Area per Person
     0.3,                      !- Fraction Radiant
     autocalculate,            !- Sensible Heat Fraction
-    Office Activity Level,    !- Activity Level Schedule Name
+    ActSchd,                  !- Activity Level Schedule Name
     3.82e-08,                 !- Carbon Dioxide Generation Rate
     No,                       !- Enable ASHRAE 55 Comfort Warnings
     EnclosureAveraged,        !- Mean Radiant Temperature Calculation Type
@@ -2135,14 +2125,14 @@ PEOPLE,
 PEOPLE,
     SPACE4-1 People,          !- Name
     SPACE4-1,                 !- Zone or ZoneList or Space or SpaceList Name
-    Always Occupied,          !- Number of People Schedule Name
+    OCCUPY-1,                 !- Number of People Schedule Name
     People,                   !- Number of People Calculation Method
     5,                        !- Number of People
     ,                         !- People per Floor Area
     ,                         !- Floor Area per Person
     0.3,                      !- Fraction Radiant
     autocalculate,            !- Sensible Heat Fraction
-    Office Activity Level,    !- Activity Level Schedule Name
+    ActSchd,                  !- Activity Level Schedule Name
     3.82e-08,                 !- Carbon Dioxide Generation Rate
     No,                       !- Enable ASHRAE 55 Comfort Warnings
     EnclosureAveraged,        !- Mean Radiant Temperature Calculation Type
@@ -2166,14 +2156,14 @@ PEOPLE,
 PEOPLE,
     SPACE5-1 People,          !- Name
     SPACE5-1,                 !- Zone or ZoneList or Space or SpaceList Name
-    Always Occupied,          !- Number of People Schedule Name
+    OCCUPY-1,                 !- Number of People Schedule Name
     People,                   !- Number of People Calculation Method
     5,                        !- Number of People
     ,                         !- People per Floor Area
     ,                         !- Floor Area per Person
     0.3,                      !- Fraction Radiant
     autocalculate,            !- Sensible Heat Fraction
-    Office Activity Level,    !- Activity Level Schedule Name
+    ActSchd,                  !- Activity Level Schedule Name
     3.82e-08,                 !- Carbon Dioxide Generation Rate
     No,                       !- Enable ASHRAE 55 Comfort Warnings
     EnclosureAveraged,        !- Mean Radiant Temperature Calculation Type
@@ -4170,6 +4160,11 @@ OUTPUT:VARIABLE,
 
 OUTPUT:VARIABLE,
     Htg-SetP-Sch,             !- Key Value
+    Schedule Value,           !- Variable Name
+    Timestep;                 !- Reporting Frequency
+
+OUTPUT:VARIABLE,
+    OCCUPY-1,                 !- Key Value
     Schedule Value,           !- Variable Name
     Timestep;                 !- Reporting Frequency
 
