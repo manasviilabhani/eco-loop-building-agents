@@ -11,6 +11,19 @@ See `docs/ARCHITECTURE.md` for the full design writeup (process boundary,
 tool-calling design, prompt/latency strategy, self-healing, honest
 tradeoffs).
 
+## Results (full week, verified)
+
+| | Baseline | AI closed-loop | Change |
+|---|---|---|---|
+| Total electricity | 920.2 kWh | 887.4 kWh | **-3.56%** |
+| Peak demand | 18,333 W | 17,551 W | **-4.27%** |
+| PMV comfort violations (occupied hrs) | 4.18% | 10.45% | +6.27 pts |
+
+A real, modest energy/peak reduction at a real (not catastrophic) comfort
+cost — see `docs/ARCHITECTURE.md`'s "Results" and "Debugging note" sections
+for how the control policy got here (it failed in two different directions
+before this) and all 3 self-healing scenarios verified working end-to-end.
+
 ## Repo layout
 
 - `models/` — baseline `.idf` + weather file, the AI closed-loop variant,

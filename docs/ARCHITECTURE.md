@@ -90,17 +90,36 @@ Tools:
 - `get_zone_state`, `get_energy_metrics`, `get_comfort_index` — read-only,
   let the model drill into detail beyond the compact snapshot it's given.
 - `set_hvac_setpoints(cooling_setpoint_c, heating_setpoint_c, reasoning)` —
-  the only tool that produces a control action. **Clamped server-side**
-  (`agent/tools.py::clamp_setpoint_pair`) to `[20°C, 28°C]` and to a minimum
-  2°C heating/cooling deadband, independent of what the model requests.
-- `get_error_log`, `patch_idf_field` — Phase 3 self-healing tools (see below).
+  the only tool that produces a control action.
+- `list_schedule_names`, `get_error_log`, `patch_idf_field` — Phase 3
+  self-healing tools (see below).
 
-**Defense in depth on the deadband constraint specifically:** an early test
-run crashed EnergyPlus with `DualSetPointWithDeadBand: Effective heating
-set-point higher than effective cooling set-point` — the LLM had picked
-heating=22.75°C, cooling=22.00°C, which is physically invalid for a
-dual-setpoint thermostat. The fix is enforced **twice**, independently: once
-in the MCP tool (`agent/tools.py`) and again in the plugin itself
+**`set_hvac_setpoints` is clamped server-side three separate ways**
+(`agent/tools.py::clamp_setpoint_pair`), independent of what the model
+requests, each one added in response to a real failure observed during
+testing rather than speculatively:
+
+1. **Range clamp to `[22°C, 26°C]`.** Not just a physical sanity bound — a
+   deliberately narrow occupied-hours safety envelope. An earlier version
+   allowed the full `[20°C, 28°C]` physical range; even with a per-cycle rate
+   limit (below), the agent could still drift monotonically to an extreme
+   over many cycles and overshoot comfort the other way. A real facility
+   engineer would similarly configure a tight envelope around the building's
+   known-reasonable setpoint (23.9°C in the original schedule) rather than
+   trusting any single automation layer with the full range.
+2. **Minimum 2°C heating/cooling deadband.** An early test run crashed
+   EnergyPlus with `DualSetPointWithDeadBand: Effective heating set-point
+   higher than effective cooling set-point` — the LLM had picked
+   heating=22.75°C, cooling=22.00°C, physically invalid for a dual-setpoint
+   thermostat.
+3. **Rate limit of 0.5°C change per decision cycle** (`agent/tools.py::
+   _rate_limit`), relative to the setpoint EnergyPlus is currently reporting.
+   A prompt-only version of "make small incremental adjustments" was not
+   reliable enough by itself — the model still occasionally jumped several
+   degrees in one cycle.
+
+Each of these is enforced **twice**, independently: once in the MCP tool
+(`agent/tools.py`) and again in the plugin itself
 (`plugin/eco_loop_plugin.py::_clamp_pair`) right before actuation — the
 plugin does not trust the agent service's HTTP response at face value, on the
 theory that a component this close to a fatal-crash boundary should not
@@ -143,19 +162,37 @@ field, corrected value) → the harness reruns the patched IDF, up to
 `MAX_RETRIES` times.
 
 Three broken variants (`models/seed_broken_variants.py`) demonstrate this
-with realistic, distinct faults:
+with realistic, distinct faults, **all three verified working end-to-end**:
 - `broken_bad_people_count.idf` — negative occupant count (IDD range
-  violation).
+  violation). Fixed on the first patch attempt.
 - `broken_dangling_schedule.idf` — a People object references a schedule
-  name that doesn't exist.
+  name that doesn't exist. Fixed on the first patch attempt once the model
+  had a `list_schedule_names` tool to look up a real name instead of
+  inventing one (see below).
 - `broken_invalid_comfort_model.idf` — an invalid enum value on the Fanger
-  comfort model field.
+  comfort model field. Fixed on the first patch attempt once the prompt
+  named the exact valid enum values (see below).
 
-Verified worked end-to-end on `broken_bad_people_count.idf`: EnergyPlus fails
-with `Number_of_People = "-5" - Expected number greater than or equal to
-0.000000`, the agent reads that, calls `patch_idf_field` to set it to a valid
-value, and the patched IDF runs cleanly on the very next attempt (2 attempts
-total, 5 tool-calling turns).
+Two real robustness gaps surfaced and got fixed during testing, not just in
+the abstract:
+
+- **Case/format mismatches broke object and field lookups.** EnergyPlus's
+  own `.err` messages upper-case object names (`SPACE2-1 PEOPLE` for an
+  object actually named `SPACE2-1 People`), and the model would echo that
+  back or use inconsistent field-name casing (`ActivityLevelScheduleName`
+  vs. the real `Activity_Level_Schedule_Name`). Worse, calling `setattr` on
+  an eppy object silently accepts *any* attribute name without validating it
+  against real IDF fields — a wrong field name was a silent no-op, not an
+  error, so the model got no signal its "fix" hadn't actually done anything,
+  and the exact same crash repeated on the next attempt. Fixed with
+  case/format-insensitive matching on both object and field names, and by
+  making `patch_idf_field` explicitly validate `field_name` against the
+  object's real fields and return the valid list on mismatch.
+- **The model invented plausible-sounding names that didn't exist.** For the
+  dangling-schedule fault, its first "fix" set the reference to a new
+  hallucinated schedule name (`"Standard Schedule"`) that was just as
+  broken. Fixed by adding a `list_schedule_names` tool and instructing the
+  model to look up a real name rather than guess one.
 
 ## Debugging note: occupancy-gated comfort scoring
 
@@ -175,10 +212,55 @@ PMV was still being scored against a hypothetical occupant who isn't there.
 The actual fix was scoring comfort only during occupied hours
 (`scripts/run_comparison.py::summarize`, filtered on a new `OCCUPY-1`
 `Output:Variable`) -- comfort is only meaningful when someone can feel it.
-That took the baseline's occupied-hours violation rate to a realistic 2.5%,
-which is the number the AI closed-loop is actually being compared against.
 This fix changes how *both* runs are scored equally; it does not favor
 either one.
+
+## Debugging note: the stock building model already had People objects
+
+A second, more consequential bug: `models/prepare_baseline.py` was adding a
+*second* `People` object to each zone (e.g. `"SPACE1-1 People"` alongside the
+stock file's own `"SPACE1-1 People 1"`), because an earlier grep search for
+existing `People,` objects in `5ZoneAirCooled.idf` used a whitespace pattern
+that missed them (the stock file indents with two spaces; the search assumed
+none). This silently double-counted internal heat gains in every run
+(baseline and AI both), and separately made the self-healing demo flaky: with
+two `"SPACE2-1 People*"` objects, `patch_idf_field`'s object-name lookup
+sometimes matched the wrong one and appeared to "succeed" while never
+touching the actually-broken object, so the identical crash repeated on the
+next attempt.
+
+Fixed by extending the zones' existing People objects with the Fanger
+comfort-model fields instead of creating new ones. This changed the
+baseline's own numbers (958.9 kWh / 2.55% -> 920.2 kWh / 4.18% PMV
+violations at occupied hours) -- expected, since removing double-counted
+internal gains means less cooling load and a more realistic (if now
+slightly less "safe") comfort baseline. Caught by directly inspecting the
+generated `.idf` for duplicate object names after the self-healing demo kept
+failing identically across retries, rather than assuming the LLM was simply
+bad at the task.
+
+## Results (full week, baseline vs. AI closed-loop)
+
+| Metric | Baseline | AI closed-loop | Change |
+|---|---|---|---|
+| Total facility electricity | 920.2 kWh | 887.4 kWh | **-3.56%** |
+| Peak demand | 18,333 W | 17,551 W | **-4.27%** |
+| PMV comfort violations (occupied hours) | 4.18% | 10.45% | +6.27 pts |
+
+**Honest characterization:** the closed loop delivers a real, modest energy
+and peak-demand reduction, at a real (not catastrophic) comfort cost. Getting
+here took several iterations of genuine debugging, not just prompt tuning in
+the abstract -- earlier versions of the control policy scored *worse* than
+baseline on both energy and comfort simultaneously (see the two debugging
+notes above and in "Prompt & latency strategy"): first from systematically
+overcooling (the two-sided nature of PMV wasn't explicit enough in the
+prompt), then from overcorrecting and drifting to the opposite extreme
+(absolute-target setpoint picks with no true feedback control). The current
+result is a genuine, working, bounded closed loop with a real net benefit --
+not a perfectly-tuned controller. With more time, a next step would be
+tightening the comfort/energy tradeoff further, e.g. a smaller rate-limit
+step, a narrower safety envelope, or per-zone (not building-wide) setpoints
+so a single mis-read zone can't push the whole building off comfort target.
 
 ## Honest tradeoffs
 
