@@ -39,17 +39,19 @@ HEAT_COL = "HTG-SETP-SCH:Schedule Value [](TimeStep)"
 
 st.set_page_config(page_title="Eco-Loop Building Agents", layout="wide", page_icon="🏢")
 
-st.markdown(
+# st.html, not st.markdown(unsafe_allow_html=True): the markdown route is not
+# honoured on Streamlit Community Cloud, which rendered the raw <style> block
+# and every <div> as literal text on the page. st.html is the supported API
+# for injecting markup and works in both places.
+st.html(
     """
     <style>
       .block-container { padding-top: 2.5rem; max-width: 1180px; }
       [data-testid="stMetricValue"] { font-size: 1.75rem; }
       .hero { font-size: 3.4rem; line-height: 1; font-weight: 600; letter-spacing: -0.02em; }
       .hero-sub { color: #52514e; font-size: 0.95rem; margin-top: .35rem; }
-      .rule { border-top: 1px solid #e8e6e1; margin: 1.6rem 0 1.2rem; }
     </style>
-    """,
-    unsafe_allow_html=True,
+    """
 )
 
 st.title("Eco-Loop Building Agents")
@@ -92,7 +94,7 @@ if meta["weather_source"] == "observed":
 else:
     st.caption(f"**{meta['label']}** · EnergyPlus bundled TMY3 typical-meteorological-year file, {meta['period']}.")
 
-st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
+st.divider()
 
 # --- Headline. The story is one number, so it gets hero treatment rather
 # --- than being one metric among six competing for attention.
@@ -104,11 +106,10 @@ hero, tiles = st.columns([1, 2.1], gap="large")
 with hero:
     sign = "−" if summary["kwh_reduction_pct"] > 0 else "+"
     color = theme.AI if summary["kwh_reduction_pct"] > 0 else theme.TEXT_PRIMARY
-    st.markdown(
+    st.html(
         f'<div class="hero" style="color:{color}">{sign}{abs(summary["kwh_reduction_pct"]):.2f}%</div>'
         f'<div class="hero-sub">electricity vs. baseline<br>'
-        f'{baseline["total_kwh"]:.0f} → {ai["total_kwh"]:.0f} kWh ({kwh_delta:+.0f})</div>',
-        unsafe_allow_html=True,
+        f'{baseline["total_kwh"]:.0f} &rarr; {ai["total_kwh"]:.0f} kWh ({kwh_delta:+.0f})</div>'
     )
 with tiles:
     a, b, c = st.columns(3)
@@ -145,14 +146,14 @@ def ts_col(df, prefix):
     return next((c for c in df.columns if c.startswith(prefix) and c.endswith("(TimeStep)")), None)
 
 
-st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
+st.divider()
 st.subheader("Electricity demand")
 
 fig = go.Figure()
 fig.add_trace(theme.line(None, x, baseline_df[DEMAND_COL] / 1000, "Baseline", theme.BASELINE))
 fig.add_trace(theme.line(None, x_ai, ai_df[DEMAND_COL] / 1000, "AI closed-loop", theme.AI))
 theme.style(fig, ylabel="Facility demand (kW)", height=360)
-st.plotly_chart(fig, use_container_width=True)
+st.plotly_chart(fig, width="stretch")
 
 # --- Outdoor conditions: two charts, never one with two y-axes. Temperature
 # --- and humidity are different measures on different scales; overlaying them
@@ -171,7 +172,7 @@ if temp_col:
         f = go.Figure()
         f.add_trace(theme.line(None, x, baseline_df[temp_col], "Outdoor drybulb", theme.WEATHER_TEMP))
         theme.style(f, ylabel="Drybulb temperature (°C)", height=260, legend=False)
-        st.plotly_chart(f, use_container_width=True)
+        st.plotly_chart(f, width="stretch")
         st.caption(f"Range {baseline_df[temp_col].min():.1f} – {baseline_df[temp_col].max():.1f} °C")
     with right:
         if rh_col:
@@ -179,10 +180,10 @@ if temp_col:
             f2.add_trace(theme.line(None, x, baseline_df[rh_col], "Relative humidity", theme.WEATHER_RH))
             f2.update_yaxes(range=[0, 100])
             theme.style(f2, ylabel="Relative humidity (%)", height=260, legend=False)
-            st.plotly_chart(f2, use_container_width=True)
+            st.plotly_chart(f2, width="stretch")
             st.caption(f"Range {baseline_df[rh_col].min():.0f} – {baseline_df[rh_col].max():.0f} %")
 
-st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
+st.divider()
 st.subheader("Thermal comfort (PMV)")
 zone_choice = st.selectbox("Zone", ZONES, help="Fanger Predicted Mean Vote for the selected zone.")
 pmv_col = f"{zone_choice} PEOPLE 1:Zone Thermal Comfort Fanger Model PMV [](TimeStep)"
@@ -196,7 +197,7 @@ fig2.add_annotation(
     x=1, y=0.5, xref="paper", yref="y", text="comfort band", showarrow=False,
     xanchor="right", yanchor="bottom", font=dict(size=11, color=theme.TEXT_MUTED),
 )
-st.plotly_chart(fig2, use_container_width=True)
+st.plotly_chart(fig2, width="stretch")
 
 st.subheader("HVAC setpoints the agent chose")
 fig3 = go.Figure()
@@ -204,7 +205,7 @@ fig3.add_trace(theme.line(None, x_ai, ai_df[COOL_COL], "Cooling setpoint", theme
 fig3.add_trace(theme.line(None, x, baseline_df[COOL_COL], "Baseline schedule", theme.BASELINE, dash="dot"))
 theme.style(fig3, ylabel="Cooling setpoint (°C)", height=320)
 theme.pad_y(fig3, pd.concat([ai_df[COOL_COL], baseline_df[COOL_COL]]))
-st.plotly_chart(fig3, use_container_width=True)
+st.plotly_chart(fig3, width="stretch")
 st.caption(
     f"The agent moved the cooling setpoint across {ai_df[COOL_COL].nunique()} distinct values "
     f"({ai_df[COOL_COL].min():.1f}–{ai_df[COOL_COL].max():.1f} °C) against the baseline schedule's "
@@ -214,7 +215,7 @@ st.caption(
 
 # --- Table view. Identity is never carried by colour alone, and every number
 # --- plotted above is readable here.
-st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
+st.divider()
 with st.expander("Results as a table"):
     # Change is always AI minus baseline, so negative is the improvement in
     # every row -- kwh_reduction_pct is stored as a reduction and so is negated.
@@ -226,7 +227,7 @@ with st.expander("Results as a table"):
                 {"Metric": "PMV violations (%)", "Baseline": baseline["pmv_violation_pct"], "AI closed-loop": ai["pmv_violation_pct"], "Change": f"{pmv_delta:+.2f} pts"},
             ]
         ),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
     st.caption("Change is AI minus baseline — negative is better in every row.")
@@ -257,7 +258,7 @@ if len(available) > 1:
                     "Comfort Δ": f"{s['ai_closed_loop']['pmv_violation_pct'] - s['baseline']['pmv_violation_pct']:+.2f} pts",
                 }
             )
-        st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch", hide_index=True)
         st.caption(
             "Δ columns are all AI minus baseline, so **negative is better in every one**. "
             "Absolute kWh is not comparable across sites — different weather means a different "

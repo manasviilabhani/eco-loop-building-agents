@@ -31,13 +31,12 @@ from models import locations  # noqa: E402
 import theme  # noqa: E402
 
 st.set_page_config(page_title="Eco-Loop: Live", layout="wide", page_icon="🏢")
-st.markdown(
+# st.html rather than st.markdown(unsafe_allow_html=True) -- see app.py.
+st.html(
     """<style>
       .block-container { padding-top: 2.5rem; max-width: 1180px; }
       [data-testid="stMetricValue"] { font-size: 1.6rem; }
-      .rule { border-top: 1px solid #e8e6e1; margin: 1.4rem 0 1rem; }
-    </style>""",
-    unsafe_allow_html=True,
+    </style>"""
 )
 st.title("Live simulation view")
 st.caption(
@@ -174,7 +173,7 @@ def live_section():
     col2.metric("Latest cooling setpoint", f"{df['cooling_setpoint_c'].iloc[-1]:.1f} C")
     col3.metric("Latest heating setpoint", f"{df['heating_setpoint_c'].iloc[-1]:.1f} C")
 
-    st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
+    st.divider()
     st.subheader("Electricity demand")
     fig = go.Figure()
     if not baseline_df.empty:
@@ -187,7 +186,7 @@ def live_section():
                    "AI closed-loop (live)", theme.AI)
     )
     theme.style(fig, xlabel="Decision cycle (simulated hour)", ylabel="Facility demand (kW)", height=340)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     st.subheader("Setpoints")
     fig2 = go.Figure()
@@ -200,7 +199,7 @@ def live_section():
         theme.line(None, df["hour_index"], df["cooling_setpoint_c"], "Cooling (AI)", theme.AI)
     )
     theme.style(fig2, xlabel="Decision cycle (simulated hour)", ylabel="Cooling setpoint (°C)", height=320)
-    st.plotly_chart(fig2, use_container_width=True)
+    st.plotly_chart(fig2, width="stretch")
 
     if df["reasoning"].iloc[-1]:
         st.info(f"**Latest reasoning** — {df['reasoning'].iloc[-1]}")

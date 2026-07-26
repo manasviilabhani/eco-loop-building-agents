@@ -8,4 +8,4 @@ eppy>=0.5.63
 # Data / dashboard
 pandas>=2.2.0
 plotly>=5.24.0
-streamlit>=1.40.0
+streamlit>=1.60.0

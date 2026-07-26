@@ -5,5 +5,5 @@
 # MCP, so it doesn't need those heavier dependencies.
 pandas>=2.2.0
 plotly>=5.24.0
-streamlit>=1.40.0
+streamlit>=1.60.0
 requests>=2.32.0
