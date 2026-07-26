@@ -174,7 +174,14 @@ def live_variant(base_key: str, day: date | None = None, days: int = 1) -> Locat
     )
 
 
-LOCATIONS["hyderabad_live"] = live_variant("hyderabad")
+# Register a live variant for every base site, not just one. These have to be
+# in LOCATIONS for the live view to resolve them: it identifies a run's site by
+# matching the run_id's prefix against the registered keys, so an unregistered
+# "chicago_live-..." run would fail every match and silently fall back to the
+# default site -- i.e. a Chicago live run would be plotted as if it were the
+# plain Chicago week.
+for _base in [k for k, v in LOCATIONS.items() if not k.endswith(LIVE_SUFFIX)]:
+    LOCATIONS[f"{_base}{LIVE_SUFFIX}"] = live_variant(_base)
 
 
 def get(key: str) -> Location:
