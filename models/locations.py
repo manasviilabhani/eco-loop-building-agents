@@ -29,7 +29,8 @@ committed Chicago results, and the self-healing demo keep working untouched.
 Other locations get a "_{key}" suffix.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
+from datetime import date, timedelta
 from pathlib import Path
 
 MODELS_DIR = Path(__file__).parent
@@ -57,6 +58,10 @@ class Location:
     run_year: int | None  # real year for "observed"; None for TMY
     weather_file: Path
     is_default: bool = False
+    # A "live" variant reuses its parent site's design conditions rather than
+    # deriving its own -- design days describe the *climate*, which does not
+    # change because we are simulating a different day of it.
+    design_source_key: str | None = None
 
     @property
     def suffix(self) -> str:
@@ -80,7 +85,7 @@ class Location:
         this site (written by fetch_weather.py). Only "observed" locations
         need this -- TMY locations already carry design days in the stock
         IDF."""
-        return WEATHER_DIR / f"{self.key}_design_conditions.json"
+        return WEATHER_DIR / f"{self.design_source_key or self.key}_design_conditions.json"
 
     def run_dir(self, which: str) -> Path:
         return REPO / "runs" / f"{which}_full{self.suffix}"
@@ -132,6 +137,44 @@ LOCATIONS: dict[str, Location] = {
 }
 
 DEFAULT_LOCATION = "chicago"
+
+# --- Live "today" variants -------------------------------------------------
+#
+# A live site simulates *today* at a real location, on weather pulled fresh
+# from Open-Meteo's forecast endpoint (which serves both the hours already
+# observed today and the forecast for the rest of it). scripts/live_daemon.py
+# rebuilds this every cycle so the day being simulated is always the current
+# one.
+#
+# The entry registered in LOCATIONS is a placeholder whose run period is
+# resolved at import time; only its key and label are used by the dashboards.
+# The daemon always calls live_variant() to get a Location pinned to the real
+# current date, so a process running past midnight still rolls over correctly.
+
+LIVE_SUFFIX = "_live"
+
+
+def live_variant(base_key: str, day: date | None = None, days: int = 1) -> Location:
+    """Build a Location for `days` starting at `day` (default: today) at the
+    same physical site as `base_key`, sourced from forecast rather than
+    archive weather."""
+    base = LOCATIONS[base_key] if base_key in LOCATIONS else get(base_key)
+    day = day or date.today()
+    end = day + timedelta(days=days - 1)
+    return replace(
+        base,
+        key=f"{base_key}{LIVE_SUFFIX}",
+        label=f"{base.city} — live (today)",
+        weather_source="forecast",
+        run_period=((day.month, day.day), (end.month, end.day)),
+        run_year=day.year,
+        weather_file=WEATHER_DIR / f"{base_key}{LIVE_SUFFIX}.epw",
+        is_default=False,
+        design_source_key=base_key,
+    )
+
+
+LOCATIONS["hyderabad_live"] = live_variant("hyderabad")
 
 
 def get(key: str) -> Location:

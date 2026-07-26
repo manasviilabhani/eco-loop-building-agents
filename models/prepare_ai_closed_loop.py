@@ -21,12 +21,8 @@ EPLUS_DIR = Path("/Applications/EnergyPlus-26-1-0")
 PLUGIN_DIR = Path(__file__).parent.parent / "plugin"
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Build ai_closed_loop.idf for a site.")
-    locations.add_location_arg(parser)
-    args = parser.parse_args()
-    loc = locations.get(args.location)
-
+def build(loc: locations.Location):
+    """Importable entry point -- see prepare_baseline.build()."""
     if not loc.baseline_idf.exists():
         raise SystemExit(
             f"Missing {loc.baseline_idf}.\n"
@@ -54,6 +50,14 @@ def main():
 
     idf.saveas(str(loc.ai_idf))
     print(f"Wrote {loc.ai_idf}  [{loc.label}]")
+    return loc.ai_idf
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Build ai_closed_loop.idf for a site.")
+    locations.add_location_arg(parser)
+    args = parser.parse_args()
+    build(locations.get(args.location))
 
 
 if __name__ == "__main__":

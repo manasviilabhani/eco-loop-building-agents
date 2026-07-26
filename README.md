@@ -168,6 +168,34 @@ ollama pull qwen2.5:7b-instruct
    so no Supabase schema change was needed and rows written before
    multi-site support still read back correctly (as Chicago).
 
+7. **Live "today" daemon** — continuously simulates the current day at a real
+   site on freshly fetched weather, so the live view always has the agent
+   working through today:
+   ```
+   source .env.local            # SUPABASE_URL / SUPABASE_ANON_KEY
+   python -m agent.service &
+   python scripts/live_daemon.py --site hyderabad
+   ```
+   Each cycle pulls today's weather from Open-Meteo's *forecast* endpoint
+   (the hours already observed today, plus the forecast for the rest of it),
+   rebuilds the model for today's date, runs the baseline, then runs the AI
+   closed loop — streaming each hourly decision to the dashboard as it
+   happens. Roughly 10 minutes per cycle (24 decisions), then it repeats with
+   refreshed weather.
+
+   What "live" honestly means here:
+
+   - The **weather is real** — part observation, part forecast, refreshed by
+     Open-Meteo about every 15 minutes. That, not the page's 3-second poll,
+     is the rate at which genuinely new weather information exists.
+   - The **building state legitimately changes much faster** than the
+     weather: thermal mass, the occupancy schedule and HVAC cycling all
+     evolve between weather points, and EnergyPlus interpolates hourly
+     weather onto its 15-minute timestep natively (`Timestep, 4`).
+   - **Simulated time is not wall-clock time.** A cycle replays a whole day
+     in ~10 minutes, so the page shows "the agent working through today's
+     weather", not "the building at this exact second".
+
 ## Notes
 
 - Building: EnergyPlus's bundled `5ZoneAirCooled.idf` (5-zone packaged-AC

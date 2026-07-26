@@ -45,3 +45,10 @@ eplusmtr.*
 
 # Local-only secrets for the live view (never commit)
 .env.local
+
+# Live "today" artifacts -- regenerated every daemon cycle, so committing them
+# would churn the repo with a new weather file and IDF pair every few minutes.
+models/weather/*_live.epw
+models/baseline_*_live.idf
+models/ai_closed_loop_*_live.idf
+runs/*_full_*_live/

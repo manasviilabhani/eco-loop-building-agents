@@ -156,11 +156,10 @@ def apply_location(idf, loc: locations.Location):
     )
 
 
-def main():
-    parser = argparse.ArgumentParser(description="Build baseline.idf for a site.")
-    locations.add_location_arg(parser)
-    args = parser.parse_args()
-    loc = locations.get(args.location)
+def build(loc: locations.Location):
+    """Importable entry point -- scripts/live_daemon.py drives this directly
+    with a Location pinned to the current date, which the --location flag
+    cannot express."""
     out_idf = loc.baseline_idf
 
     IDF.setiddname(str(IDD_PATH))
@@ -285,6 +284,14 @@ def main():
 
     idf.saveas(str(out_idf))
     print(f"Wrote {out_idf}  [{loc.label}]")
+    return out_idf
+
+
+def main():
+    parser = argparse.ArgumentParser(description="Build baseline.idf for a site.")
+    locations.add_location_arg(parser)
+    args = parser.parse_args()
+    build(locations.get(args.location))
 
 
 if __name__ == "__main__":
