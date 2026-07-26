@@ -47,7 +47,7 @@ import subprocess
 import sys
 import time
 import traceback
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
@@ -82,9 +82,27 @@ def run_eplus(idf: Path, out_dir: Path, weather: Path, location_key: str):
         raise RuntimeError(f"EnergyPlus failed ({proc.returncode}):\n{tail}")
 
 
-def cycle(site: str, push_baseline: bool) -> None:
-    """One full pass: fetch today's weather, rebuild, run, stream."""
-    loc = locations.live_variant(site)  # pinned to today, so this rolls over at midnight
+def resolve_day(spec: str) -> date:
+    """`today`, `tomorrow`, `+N`, or an ISO date.
+
+    Worth having because the building's occupancy schedule is weekday-only:
+    on a weekend the HVAC never leaves setback, so the agent has nothing to
+    control and a live view of "today" is a flat line. Pointing the daemon at
+    the next weekday shows the loop actually working, on real forecast
+    weather rather than invented conditions."""
+    spec = spec.strip().lower()
+    if spec == "today":
+        return date.today()
+    if spec == "tomorrow":
+        return date.today() + timedelta(days=1)
+    if spec.startswith("+"):
+        return date.today() + timedelta(days=int(spec[1:]))
+    return date.fromisoformat(spec)
+
+
+def cycle(site: str, push_baseline: bool, day: date | None = None) -> None:
+    """One full pass: fetch the day's weather, rebuild, run, stream."""
+    loc = locations.live_variant(site, day=day)
     (m, d), _ = loc.run_period
     log(f"--- cycle for {loc.label}: {loc.run_year}-{m:02d}-{d:02d} ---")
 
@@ -124,6 +142,13 @@ def main():
         "--interval", type=int, default=DEFAULT_INTERVAL_S,
         help=f"seconds to wait between cycles (default: {DEFAULT_INTERVAL_S})",
     )
+    parser.add_argument(
+        "--day", default="today",
+        help="which day to simulate: today | tomorrow | +N | YYYY-MM-DD. "
+             "Weekends are unoccupied, so the HVAC never runs and the agent "
+             "has nothing to do -- point this at a weekday for a live view "
+             "that actually moves. Default: today",
+    )
     parser.add_argument("--once", action="store_true", help="run a single cycle and exit")
     parser.add_argument(
         "--no-baseline-push", action="store_true",
@@ -142,11 +167,18 @@ def main():
         if s not in locations.LOCATIONS:
             raise SystemExit(f"Unknown site {s!r}. Available: {', '.join(sorted(locations.LOCATIONS))}")
 
-    log(f"live daemon starting: sites={sites} interval={args.interval}s once={args.once}")
+    day = resolve_day(args.day)
+    if day.weekday() >= 5:
+        log(f"NOTE: {day} is a {day.strftime('%A')} -- the building is unoccupied, so the "
+            "HVAC stays in setback and the agent has nothing to control. Use --day tomorrow "
+            "or --day <a weekday> for a live view with actual activity.")
+
+    log(f"live daemon starting: sites={sites} day={day} ({day.strftime('%A')}) "
+        f"interval={args.interval}s once={args.once}")
     while True:
         for site in sites:
             try:
-                cycle(site, push_baseline=not args.no_baseline_push)
+                cycle(site, push_baseline=not args.no_baseline_push, day=resolve_day(args.day))
             except Exception:
                 # A daemon that dies on one bad cycle is worse than useless --
                 # a transient Open-Meteo timeout or a stopped agent service

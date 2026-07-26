@@ -215,10 +215,16 @@ def _epw_header(loc: locations.Location, start: date, end: date, ground_temps: l
     # came from: a "today" file is part observation and part forecast, and
     # labelling that as ERA5 reanalysis (as this line used to, unconditionally)
     # would misdescribe it to anyone who opened the file later.
+    #
+    # NO COMMAS in this string. EPW is comma-separated with positional fields,
+    # so a comma here silently shifts every field after it -- an earlier
+    # version read "(part observed, part FORECAST)" and EnergyPlus then parsed
+    # the WMO number as the latitude and the longitude as the time zone, and
+    # fatally errored with "Latitude must be between -90 and 90; Entered=431280".
     source = (
-        "Open-Meteo forecast endpoint (part observed, part FORECAST)"
+        "Open-Meteo forecast endpoint - part observed / part FORECAST"
         if loc.weather_source == "forecast"
-        else "Open-Meteo ERA5 reanalysis (observed)"
+        else "Open-Meteo ERA5 reanalysis - observed"
     )
     return [
         f"LOCATION,{loc.city},{loc.region},{loc.country},{source},"
