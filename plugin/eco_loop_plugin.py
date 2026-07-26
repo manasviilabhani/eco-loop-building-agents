@@ -91,7 +91,21 @@ class EcoLoopController(EnergyPlusPlugin):
         # sets ECO_LOOP_LOCATION when it launches EnergyPlus; a bare
         # `energyplus` invocation just gets the default.
         site = os.environ.get("ECO_LOOP_LOCATION", "chicago")
-        self.run_id = f"{site}-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+        # ECO_LOOP_RUN_ID lets the caller pin a stable id -- the realtime
+        # daemon reuses one id per site per day so that re-running the day so
+        # far replaces its own rows instead of piling up a new series every
+        # time it refreshes.
+        self.run_id = os.environ.get("ECO_LOOP_RUN_ID") or (
+            f"{site}-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+        )
+        # ECO_LOOP_MAX_HOUR clamps what reaches the dashboard to the hours
+        # that have actually elapsed in the real world. The simulation still
+        # runs the whole day (later hours cannot affect earlier ones, so
+        # truncating the *display* is physically sound), but nothing beyond
+        # the current wall-clock hour is published -- otherwise the "live"
+        # chart would show the building's future.
+        raw_max = os.environ.get("ECO_LOOP_MAX_HOUR", "")
+        self.max_published_hour = int(raw_max) if raw_max.strip() else None
         self.hour_index = 0
 
         self.h = {}  # sensor/actuator handles, keyed by name
@@ -103,6 +117,9 @@ class EcoLoopController(EnergyPlusPlugin):
             self.h[f"pmv_{zone}"] = exch.get_variable_handle(
                 state, "Zone Thermal Comfort Fanger Model PMV", f"{zone} PEOPLE 1"
             )
+        self.h["outdoor_temp"] = exch.get_variable_handle(
+            state, "Site Outdoor Air Drybulb Temperature", "Environment"
+        )
         self.h["facility_demand"] = exch.get_variable_handle(
             state, "Facility Total Electricity Demand Rate", "Whole Building"
         )
@@ -131,11 +148,17 @@ class EcoLoopController(EnergyPlusPlugin):
                 "pmv": exch.get_variable_value(state, self.h[f"pmv_{zone}"]),
             }
         hour = exch.hour(state)
+        published = (
+            self.max_published_hour is None or self.hour_index <= self.max_published_hour
+        )
         return {
-            "run_id": self.run_id,
+            # Omitting run_id is how a snapshot opts out of the live push:
+            # agent/service.py only forwards rows that carry one.
+            **({"run_id": self.run_id} if published else {}),
             "hour_index": self.hour_index,
             "sim_time": f"{exch.month(state):02d}-{exch.day_of_month(state):02d} {hour:02d}:00",
             "zones": zones,
+            "outdoor_temp_c": exch.get_variable_value(state, self.h["outdoor_temp"]),
             "facility_demand_w": exch.get_variable_value(state, self.h["facility_demand"]),
             "cooling_setpoint_c": exch.get_variable_value(state, self.h["cooling_setpoint_sensor"]),
             "heating_setpoint_c": exch.get_variable_value(state, self.h["heating_setpoint_sensor"]),

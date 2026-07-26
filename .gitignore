@@ -52,3 +52,6 @@ models/weather/*_live.epw
 models/baseline_*_live.idf
 models/ai_closed_loop_*_live.idf
 runs/*_full_*_live/
+
+# Local Streamlit secrets (never commit)
+.streamlit/secrets.toml

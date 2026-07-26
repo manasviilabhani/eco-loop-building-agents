@@ -63,13 +63,13 @@ def log(msg: str):
     print(f"[{datetime.now():%H:%M:%S}] {msg}", flush=True)
 
 
-def run_eplus(idf: Path, out_dir: Path, weather: Path, location_key: str):
+def run_eplus(idf: Path, out_dir: Path, weather: Path, location_key: str, extra_env: dict | None = None):
     import shutil
 
     if out_dir.exists():
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True)
-    env = {**os.environ, "ECO_LOOP_LOCATION": location_key}
+    env = {**os.environ, "ECO_LOOP_LOCATION": location_key, **(extra_env or {})}
     proc = subprocess.run(
         [EPLUS, "-w", str(weather), "-d", str(out_dir), "--readvars", str(idf)],
         capture_output=True,
@@ -100,8 +100,33 @@ def resolve_day(spec: str) -> date:
     return date.fromisoformat(spec)
 
 
-def cycle(site: str, push_baseline: bool, day: date | None = None) -> None:
-    """One full pass: fetch the day's weather, rebuild, run, stream."""
+def clear_run(run_id: str) -> None:
+    """Drop a run's rows so the next pass replaces them rather than appending
+    a second copy. Realtime mode reuses one run_id per site per day."""
+    import urllib.request
+
+    url = os.environ["SUPABASE_URL"].rstrip("/")
+    key = os.environ["SUPABASE_ANON_KEY"]
+    req = urllib.request.Request(
+        f"{url}/rest/v1/live_decisions?run_id=eq.{run_id}",
+        method="DELETE",
+        headers={"apikey": key, "Authorization": f"Bearer {key}"},
+    )
+    try:
+        urllib.request.urlopen(req, timeout=15)
+    except Exception as e:  # non-fatal: a stale duplicate is better than a dead loop
+        log(f"  (could not clear {run_id}: {e})")
+
+
+def cycle(site: str, push_baseline: bool, day: date | None = None, realtime: bool = False) -> None:
+    """One full pass: fetch the day's weather, rebuild, run, stream.
+
+    In realtime mode the simulation still covers the whole day, but only the
+    hours that have already elapsed in the real world are published, and the
+    run keeps a stable per-day id so each pass replaces its own rows. The
+    chart therefore shows exactly the hours that have happened and grows by
+    one point per real hour -- rather than replaying a whole day every few
+    minutes."""
     loc = locations.live_variant(site, day=day)
     (m, d), _ = loc.run_period
     log(f"--- cycle for {loc.label}: {loc.run_year}-{m:02d}-{d:02d} ---")
@@ -122,8 +147,20 @@ def cycle(site: str, push_baseline: bool, day: date | None = None) -> None:
             check=False,
         )
 
-    log("running AI closed loop -- decisions stream to the dashboard as they happen...")
-    run_eplus(loc.ai_idf, loc.run_dir("ai_closed_loop"), loc.weather_file, loc.key)
+    extra_env = {}
+    if realtime:
+        now = datetime.now()
+        # EnergyPlus hour_index counts 1..24, so the hour that has just
+        # finished is the current clock hour (00:xx -> hour 1).
+        max_hour = now.hour + 1
+        run_id = f"{loc.key}-{loc.run_year}{loc.run_period[0][0]:02d}{loc.run_period[0][1]:02d}"
+        extra_env = {"ECO_LOOP_RUN_ID": run_id, "ECO_LOOP_MAX_HOUR": str(max_hour)}
+        log(f"realtime: publishing hours 1-{max_hour} (local time {now:%H:%M}), run_id={run_id}")
+        clear_run(run_id)
+    else:
+        log("running AI closed loop -- decisions stream to the dashboard as they happen...")
+
+    run_eplus(loc.ai_idf, loc.run_dir("ai_closed_loop"), loc.weather_file, loc.key, extra_env)
     log("cycle complete")
 
 
@@ -148,6 +185,12 @@ def main():
              "Weekends are unoccupied, so the HVAC never runs and the agent "
              "has nothing to do -- point this at a weekday for a live view "
              "that actually moves. Default: today",
+    )
+    parser.add_argument(
+        "--realtime", action="store_true",
+        help="track wall-clock time: publish only the hours of the day that "
+             "have actually elapsed, adding one point per real hour, instead "
+             "of replaying the whole day each cycle",
     )
     parser.add_argument("--once", action="store_true", help="run a single cycle and exit")
     parser.add_argument(
@@ -178,7 +221,12 @@ def main():
     while True:
         for site in sites:
             try:
-                cycle(site, push_baseline=not args.no_baseline_push, day=resolve_day(args.day))
+                cycle(
+                    site,
+                    push_baseline=not args.no_baseline_push,
+                    day=resolve_day(args.day),
+                    realtime=args.realtime,
+                )
             except Exception:
                 # A daemon that dies on one bad cycle is worse than useless --
                 # a transient Open-Meteo timeout or a stopped agent service

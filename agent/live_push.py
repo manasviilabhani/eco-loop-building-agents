@@ -36,7 +36,15 @@ def push_decision(run_id: str, hour_index: int, snapshot: dict, decision: dict) 
         "kind": "ai_closed_loop",
         "hour_index": hour_index,
         "sim_time": snapshot["sim_time"],
-        "zone_temps": {z: v["temp_c"] for z, v in snapshot["zones"].items()},
+        # Outdoor drybulb rides inside the existing zone_temps JSON column
+        # under a reserved key rather than as a new column: live_decisions is
+        # already deployed, and this keeps the realtime temperature chart
+        # working with no schema migration. Readers must skip keys starting
+        # with "_" when iterating zones.
+        "zone_temps": {
+            **{z: v["temp_c"] for z, v in snapshot["zones"].items()},
+            **({"_outdoor_c": snapshot["outdoor_temp_c"]} if "outdoor_temp_c" in snapshot else {}),
+        },
         "pmv": {z: v["pmv"] for z, v in snapshot["zones"].items()},
         "facility_demand_w": snapshot["facility_demand_w"],
         "cooling_setpoint_c": decision.get("cooling_setpoint_c", snapshot["cooling_setpoint_c"]),

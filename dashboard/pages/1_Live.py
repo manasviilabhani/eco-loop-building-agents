@@ -83,9 +83,34 @@ def location_of(run_id: str) -> str:
 
 
 def fetch_latest_run_id(location_key: str) -> str | None:
-    """Most recent AI run for this site. Fetches a window of recent runs and
-    filters client-side: PostgREST's `like` would need escaping and the row
-    count here is tiny, so a prefix match in Python is simpler and safer."""
+    """Most recent AI run for this site.
+
+    Filtered server-side by run_id prefix. An earlier version pulled a window
+    of the most recent rows and filtered in Python, which quietly broke as
+    soon as one busy site filled the window: a second site's runs fell off
+    the end and its page reported "no live run yet" while its data sat in the
+    table."""
+    resp = requests.get(
+        f"{SUPABASE_URL}/rest/v1/live_decisions",
+        headers=HEADERS,
+        params={
+            "select": "run_id",
+            "kind": "eq.ai_closed_loop",
+            "run_id": f"like.{location_key}-*",
+            "order": "created_at.desc",
+            "limit": 1,
+        },
+        timeout=10,
+    )
+    resp.raise_for_status()
+    rows = resp.json()
+    if rows:
+        return rows[0]["run_id"]
+
+    # Runs written before sites existed carry no prefix at all. Only the
+    # default site should adopt them, and only if it has nothing of its own.
+    if location_key != locations.DEFAULT_LOCATION:
+        return None
     resp = requests.get(
         f"{SUPABASE_URL}/rest/v1/live_decisions",
         headers=HEADERS,
@@ -93,7 +118,7 @@ def fetch_latest_run_id(location_key: str) -> str | None:
             "select": "run_id",
             "kind": "eq.ai_closed_loop",
             "order": "created_at.desc",
-            "limit": 200,
+            "limit": 500,
         },
         timeout=10,
     )
@@ -159,7 +184,18 @@ def live_section():
         return
 
     df = fetch_run(run_id)
-    st.caption(f"run_id: `{run_id}` -- {len(df)} decision(s) so far, latest: {df['sim_time'].iloc[-1]}")
+
+    # Outdoor drybulb travels inside the zone_temps JSON under a reserved
+    # "_outdoor_c" key (see agent/live_push.py) -- older rows predate it.
+    def _outdoor(v):
+        return v.get("_outdoor_c") if isinstance(v, dict) else None
+
+    df["outdoor_c"] = df["zone_temps"].map(_outdoor) if "zone_temps" in df else None
+    has_outdoor = "outdoor_c" in df and df["outdoor_c"].notna().any()
+
+    st.caption(
+        f"run_id: `{run_id}` — {len(df)} hour(s) simulated so far, latest: {df['sim_time'].iloc[-1]}"
+    )
     if baseline_df.empty:
         st.caption(
             f"No baseline reference loaded yet for {site.label} -- run "
@@ -168,10 +204,32 @@ def live_section():
         )
 
     latest_kw = df["facility_demand_w"].iloc[-1] / 1000
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Latest facility demand (AI)", f"{latest_kw:.2f} kW")
-    col2.metric("Latest cooling setpoint", f"{df['cooling_setpoint_c'].iloc[-1]:.1f} C")
-    col3.metric("Latest heating setpoint", f"{df['heating_setpoint_c'].iloc[-1]:.1f} C")
+    col1, col2, col3, col4 = st.columns(4)
+    if has_outdoor:
+        col1.metric("Outdoor temperature", f"{df['outdoor_c'].iloc[-1]:.1f} °C")
+    else:
+        col1.metric("Outdoor temperature", "—")
+    col2.metric("Facility demand (AI)", f"{latest_kw:.2f} kW")
+    col3.metric("Cooling setpoint", f"{df['cooling_setpoint_c'].iloc[-1]:.1f} °C")
+    col4.metric("Heating setpoint", f"{df['heating_setpoint_c'].iloc[-1]:.1f} °C")
+
+    if has_outdoor:
+        st.divider()
+        st.subheader("Outdoor temperature through the day")
+        figt = go.Figure()
+        figt.add_trace(
+            theme.line(None, df["hour_index"], df["outdoor_c"], "Outdoor drybulb", theme.WEATHER_TEMP)
+        )
+        theme.style(
+            figt, xlabel="Hour of day", ylabel="Outdoor drybulb (°C)", height=300, legend=False
+        )
+        figt.update_xaxes(range=[0, 24], dtick=3)
+        st.plotly_chart(figt, width="stretch")
+        st.caption(
+            f"Latest simulated hour: **{df['sim_time'].iloc[-1]}** at "
+            f"**{df['outdoor_c'].iloc[-1]:.1f} °C**. The curve stops at the hour that has "
+            "actually elapsed and extends by one point per real hour."
+        )
 
     st.divider()
     st.subheader("Electricity demand")
@@ -185,7 +243,8 @@ def live_section():
         theme.line(None, df["hour_index"], df["facility_demand_w"] / 1000,
                    "AI closed-loop (live)", theme.AI)
     )
-    theme.style(fig, xlabel="Decision cycle (simulated hour)", ylabel="Facility demand (kW)", height=340)
+    theme.style(fig, xlabel="Hour of day", ylabel="Facility demand (kW)", height=340)
+    fig.update_xaxes(range=[0, 24], dtick=3)
     st.plotly_chart(fig, width="stretch")
 
     st.subheader("Setpoints")
@@ -198,7 +257,8 @@ def live_section():
     fig2.add_trace(
         theme.line(None, df["hour_index"], df["cooling_setpoint_c"], "Cooling (AI)", theme.AI)
     )
-    theme.style(fig2, xlabel="Decision cycle (simulated hour)", ylabel="Cooling setpoint (°C)", height=320)
+    theme.style(fig2, xlabel="Hour of day", ylabel="Cooling setpoint (°C)", height=320)
+    fig2.update_xaxes(range=[0, 24], dtick=3)
     st.plotly_chart(fig2, width="stretch")
 
     if df["reasoning"].iloc[-1]:
