@@ -26,18 +26,47 @@ import requests
 import streamlit as st
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from models import locations  # noqa: E402
+import theme  # noqa: E402
 
-st.set_page_config(page_title="Eco-Loop: Live", layout="wide")
+st.set_page_config(page_title="Eco-Loop: Live", layout="wide", page_icon="🏢")
+st.markdown(
+    """<style>
+      .block-container { padding-top: 2.5rem; max-width: 1180px; }
+      [data-testid="stMetricValue"] { font-size: 1.6rem; }
+      .rule { border-top: 1px solid #e8e6e1; margin: 1.4rem 0 1rem; }
+    </style>""",
+    unsafe_allow_html=True,
+)
 st.title("Live simulation view")
+st.caption(
+    "Streams each hourly decision from a simulation running on a local machine. "
+    "This page displays; it does not run anything itself."
+)
 
-SUPABASE_URL = st.secrets.get("SUPABASE_URL", "")
-SUPABASE_ANON_KEY = st.secrets.get("SUPABASE_ANON_KEY", "")
+def _secret(name: str) -> str:
+    """st.secrets.get() still raises StreamlitSecretNotFoundError when there
+    is no secrets.toml anywhere -- the default is only honoured once a
+    secrets file exists. Without this guard a checkout with no secrets (any
+    fresh clone, and any local `streamlit run`) shows a raw traceback
+    instead of the configuration message below."""
+    try:
+        return st.secrets.get(name, "")
+    except Exception:
+        return ""
+
+
+SUPABASE_URL = _secret("SUPABASE_URL")
+SUPABASE_ANON_KEY = _secret("SUPABASE_ANON_KEY")
 
 if not SUPABASE_URL or not SUPABASE_ANON_KEY:
-    st.error(
-        "Live view isn't configured yet. Add SUPABASE_URL and SUPABASE_ANON_KEY "
-        "in this app's Settings -> Secrets on Streamlit Community Cloud."
+    st.info(
+        "**Live view isn't configured.** It streams a simulation running on a local "
+        "machine, so it needs a Supabase project to relay through.\n\n"
+        "Add `SUPABASE_URL` and `SUPABASE_ANON_KEY` under Settings → Secrets on "
+        "Streamlit Community Cloud (or in `.streamlit/secrets.toml` when running locally), "
+        "then start a run with `python scripts/run_comparison.py --location <site>`."
     )
     st.stop()
 
@@ -145,44 +174,36 @@ def live_section():
     col2.metric("Latest cooling setpoint", f"{df['cooling_setpoint_c'].iloc[-1]:.1f} C")
     col3.metric("Latest heating setpoint", f"{df['heating_setpoint_c'].iloc[-1]:.1f} C")
 
+    st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
+    st.subheader("Electricity demand")
     fig = go.Figure()
     if not baseline_df.empty:
         fig.add_trace(
-            go.Scatter(
-                x=baseline_df["hour_index"],
-                y=baseline_df["facility_demand_w"] / 1000,
-                name="Baseline (no AI)",
-                line=dict(color="#888"),
-            )
+            theme.line(None, baseline_df["hour_index"], baseline_df["facility_demand_w"] / 1000,
+                       "Baseline", theme.BASELINE)
         )
     fig.add_trace(
-        go.Scatter(
-            x=df["hour_index"],
-            y=df["facility_demand_w"] / 1000,
-            name="AI closed-loop (live)",
-            line=dict(color="#2ca02c"),
-        )
+        theme.line(None, df["hour_index"], df["facility_demand_w"] / 1000,
+                   "AI closed-loop (live)", theme.AI)
     )
-    fig.update_layout(xaxis_title="Decision cycle (hour)", yaxis_title="kW", height=350)
+    theme.style(fig, xlabel="Decision cycle (simulated hour)", ylabel="Facility demand (kW)", height=340)
     st.plotly_chart(fig, use_container_width=True)
 
+    st.subheader("Setpoints")
     fig2 = go.Figure()
-    fig2.add_trace(go.Scatter(x=df["hour_index"], y=df["cooling_setpoint_c"], name="Cooling setpoint (AI)"))
-    fig2.add_trace(go.Scatter(x=df["hour_index"], y=df["heating_setpoint_c"], name="Heating setpoint (AI)"))
     if not baseline_df.empty:
         fig2.add_trace(
-            go.Scatter(
-                x=baseline_df["hour_index"],
-                y=baseline_df["cooling_setpoint_c"],
-                name="Cooling setpoint (baseline)",
-                line=dict(color="#888", dash="dot"),
-            )
+            theme.line(None, baseline_df["hour_index"], baseline_df["cooling_setpoint_c"],
+                       "Baseline schedule", theme.BASELINE, dash="dot")
         )
-    fig2.update_layout(xaxis_title="Decision cycle (hour)", yaxis_title="Setpoint (C)", height=350)
+    fig2.add_trace(
+        theme.line(None, df["hour_index"], df["cooling_setpoint_c"], "Cooling (AI)", theme.AI)
+    )
+    theme.style(fig2, xlabel="Decision cycle (simulated hour)", ylabel="Cooling setpoint (°C)", height=320)
     st.plotly_chart(fig2, use_container_width=True)
 
     if df["reasoning"].iloc[-1]:
-        st.caption(f"Latest reasoning: {df['reasoning'].iloc[-1]}")
+        st.info(f"**Latest reasoning** — {df['reasoning'].iloc[-1]}")
 
 
 live_section()

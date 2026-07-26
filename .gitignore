@@ -42,3 +42,6 @@ eplusmtr.*
 !runs/baseline_full_hyderabad/eplusout.csv
 !runs/ai_closed_loop_full_hyderabad/
 !runs/ai_closed_loop_full_hyderabad/eplusout.csv
+
+# Local-only secrets for the live view (never commit)
+.env.local

@@ -10,6 +10,10 @@ bundled typical-meteorological-year file; Hyderabad runs on the real
 observed weather of a specific week, rebuilt into an .epw by
 models/fetch_weather.py.
 
+Visual conventions live in dashboard/theme.py -- see that module for why the
+palette is what it is and why outdoor temperature and humidity are two
+charts rather than one with two y-axes.
+
 Run: streamlit run dashboard/app.py
 """
 
@@ -23,12 +27,33 @@ import streamlit as st
 
 REPO = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(REPO))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 from models import locations  # noqa: E402
+import theme  # noqa: E402
 
 ZONES = ["SPACE1-1", "SPACE2-1", "SPACE3-1", "SPACE4-1", "SPACE5-1"]
 
-st.set_page_config(page_title="Eco-Loop Building Agents", layout="wide")
-st.title("Eco-Loop Building Agents: Baseline vs. AI Closed-Loop")
+DEMAND_COL = "Whole Building:Facility Total Electricity Demand Rate [W](TimeStep)"
+COOL_COL = "CLG-SETP-SCH:Schedule Value [](TimeStep)"
+HEAT_COL = "HTG-SETP-SCH:Schedule Value [](TimeStep)"
+
+st.set_page_config(page_title="Eco-Loop Building Agents", layout="wide", page_icon="🏢")
+
+st.markdown(
+    """
+    <style>
+      .block-container { padding-top: 2.5rem; max-width: 1180px; }
+      [data-testid="stMetricValue"] { font-size: 1.75rem; }
+      .hero { font-size: 3.4rem; line-height: 1; font-weight: 600; letter-spacing: -0.02em; }
+      .hero-sub { color: #52514e; font-size: 0.95rem; margin-top: .35rem; }
+      .rule { border-top: 1px solid #e8e6e1; margin: 1.6rem 0 1.2rem; }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
+
+st.title("Eco-Loop Building Agents")
+st.caption("A local LLM controlling HVAC setpoints inside a live EnergyPlus simulation, versus the building's own schedule.")
 
 available = [loc for loc in locations.LOCATIONS.values() if loc.summary_path.exists()]
 if not available:
@@ -43,9 +68,7 @@ if len(available) > 1:
         "Site",
         available,
         format_func=lambda l: l.label,
-        help="Each site is the same 5-zone office building run against that "
-        "location's own weather, so the comparison shows how the agent's "
-        "control strategy holds up in a different climate.",
+        help="The same 5-zone office building, run against each location's own weather.",
     )
 else:
     loc = available[0]
@@ -54,142 +77,189 @@ summary = json.loads(loc.summary_path.read_text())
 baseline = summary["baseline"]
 ai = summary["ai_closed_loop"]
 
-# "location" is absent in summaries produced before the multi-site change
-# (the committed Chicago result), so fall back to the registry rather than
-# breaking on an older file.
+# "location" is absent in summaries produced before the multi-site change, so
+# fall back to the registry rather than breaking on an older file.
 meta = summary.get(
     "location",
     {"label": loc.label, "period": "7/1-7/7 (TMY)", "weather_source": loc.weather_source},
 )
 if meta["weather_source"] == "observed":
     st.caption(
-        f"**{meta['label']}** — real observed weather for {meta['period']}, "
-        "reconstructed from the Open-Meteo ERA5 archive (not a typical-year file). "
-        "This is what the weather actually did at this site on these dates."
+        f"**{meta['label']}** · real observed weather for {meta['period']}, reconstructed "
+        "from the Open-Meteo ERA5 archive — what the weather actually did on those dates, "
+        "not a typical-year file."
     )
 else:
-    st.caption(
-        f"**{meta['label']}** — EnergyPlus's bundled TMY3 typical-meteorological-year "
-        f"weather file, {meta['period']}."
+    st.caption(f"**{meta['label']}** · EnergyPlus bundled TMY3 typical-meteorological-year file, {meta['period']}.")
+
+st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
+
+# --- Headline. The story is one number, so it gets hero treatment rather
+# --- than being one metric among six competing for attention.
+kwh_delta = ai["total_kwh"] - baseline["total_kwh"]
+peak_pct = 100 * (ai["peak_demand_w"] - baseline["peak_demand_w"]) / baseline["peak_demand_w"]
+pmv_delta = ai["pmv_violation_pct"] - baseline["pmv_violation_pct"]
+
+hero, tiles = st.columns([1, 2.1], gap="large")
+with hero:
+    sign = "−" if summary["kwh_reduction_pct"] > 0 else "+"
+    color = theme.AI if summary["kwh_reduction_pct"] > 0 else theme.TEXT_PRIMARY
+    st.markdown(
+        f'<div class="hero" style="color:{color}">{sign}{abs(summary["kwh_reduction_pct"]):.2f}%</div>'
+        f'<div class="hero-sub">electricity vs. baseline<br>'
+        f'{baseline["total_kwh"]:.0f} → {ai["total_kwh"]:.0f} kWh ({kwh_delta:+.0f})</div>',
+        unsafe_allow_html=True,
     )
-
-col1, col2, col3 = st.columns(3)
-col1.metric("Energy reduction", f"{summary['kwh_reduction_pct']}%", delta=f"{ai['total_kwh'] - baseline['total_kwh']:.0f} kWh")
-col2.metric("Baseline total kWh", f"{baseline['total_kwh']:.0f}")
-col3.metric("AI closed-loop total kWh", f"{ai['total_kwh']:.0f}")
-
-peak_pct = 100 * (baseline["peak_demand_w"] - ai["peak_demand_w"]) / baseline["peak_demand_w"]
-col4, col5, col6 = st.columns(3)
-col4.metric("Baseline peak demand", f"{baseline['peak_demand_w']/1000:.1f} kW")
-col5.metric("AI peak demand", f"{ai['peak_demand_w']/1000:.1f} kW", delta=f"{-peak_pct:.2f}%", delta_color="inverse")
-col6.metric(
-    "PMV comfort violations",
-    f"{ai['pmv_violation_pct']}%",
-    delta=f"{ai['pmv_violation_pct'] - baseline['pmv_violation_pct']:.2f} pts vs baseline",
-    delta_color="inverse",
-)
+with tiles:
+    a, b, c = st.columns(3)
+    a.metric("Peak demand", f"{ai['peak_demand_w']/1000:.1f} kW", delta=f"{peak_pct:+.2f}%", delta_color="inverse")
+    a.caption(f"baseline {baseline['peak_demand_w']/1000:.1f} kW")
+    b.metric("Comfort violations", f"{ai['pmv_violation_pct']:.2f}%", delta=f"{pmv_delta:+.2f} pts", delta_color="inverse")
+    b.caption(f"baseline {baseline['pmv_violation_pct']:.2f}%")
+    c.metric("Decision cadence", "hourly")
+    c.caption(f"{ai['pmv_readings']:,} zone-timesteps scored")
 
 st.caption(
-    "PMV comfort violations = fraction of zone-timesteps outside the target [-0.5, 0.5] Fanger PMV band. "
-    "Lower is better; the AI run should not regress meaningfully on comfort even as it cuts energy use."
+    "Comfort violations = share of **occupied** zone-timesteps outside the Fanger PMV band "
+    "[-0.5, 0.5]. Lower is better on both peak demand and comfort; a negative energy figure "
+    "bought with a large comfort regression is not a win."
 )
 
-# Cross-site view: only meaningful once more than one site has been run.
+# --- Load time series ---
+baseline_df = pd.read_csv(REPO / baseline["timeseries_csv"])
+ai_df = pd.read_csv(REPO / ai["timeseries_csv"])
+baseline_df.columns = [c.strip() for c in baseline_df.columns]
+ai_df.columns = [c.strip() for c in ai_df.columns]
+
+# Real dates on the x-axis beat an opaque timestep counter. TMY files have no
+# meaningful year, so those fall back to the run year the registry declares.
+year = loc.run_year or 2001
+x = theme.to_datetime(baseline_df, year)
+x_ai = theme.to_datetime(ai_df, year)
+
+
+def ts_col(df, prefix):
+    """Match the TimeStep-resolution series, not the Hourly one -- the stock
+    IDF also requests outdoor drybulb hourly, and a plain prefix match would
+    return a series a quarter the length of every other chart's."""
+    return next((c for c in df.columns if c.startswith(prefix) and c.endswith("(TimeStep)")), None)
+
+
+st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
+st.subheader("Electricity demand")
+
+fig = go.Figure()
+fig.add_trace(theme.line(None, x, baseline_df[DEMAND_COL] / 1000, "Baseline", theme.BASELINE))
+fig.add_trace(theme.line(None, x_ai, ai_df[DEMAND_COL] / 1000, "AI closed-loop", theme.AI))
+theme.style(fig, ylabel="Facility demand (kW)", height=360)
+st.plotly_chart(fig, use_container_width=True)
+
+# --- Outdoor conditions: two charts, never one with two y-axes. Temperature
+# --- and humidity are different measures on different scales; overlaying them
+# --- on twin axes manufactures a visual correlation the data doesn't assert.
+temp_col = ts_col(baseline_df, "Environment:Site Outdoor Air Drybulb Temperature")
+rh_col = ts_col(baseline_df, "Environment:Site Outdoor Air Relative Humidity")
+if temp_col:
+    st.subheader("Outdoor conditions driving the run")
+    st.caption(
+        "The weather the building is actually reacting to. In a monsoon climate the "
+        "cooling load is latent — humidity matters as much as temperature, and a "
+        "dry-bulb setpoint has little authority over it."
+    )
+    left, right = st.columns(2, gap="medium")
+    with left:
+        f = go.Figure()
+        f.add_trace(theme.line(None, x, baseline_df[temp_col], "Outdoor drybulb", theme.WEATHER_TEMP))
+        theme.style(f, ylabel="Drybulb temperature (°C)", height=260, legend=False)
+        st.plotly_chart(f, use_container_width=True)
+        st.caption(f"Range {baseline_df[temp_col].min():.1f} – {baseline_df[temp_col].max():.1f} °C")
+    with right:
+        if rh_col:
+            f2 = go.Figure()
+            f2.add_trace(theme.line(None, x, baseline_df[rh_col], "Relative humidity", theme.WEATHER_RH))
+            f2.update_yaxes(range=[0, 100])
+            theme.style(f2, ylabel="Relative humidity (%)", height=260, legend=False)
+            st.plotly_chart(f2, use_container_width=True)
+            st.caption(f"Range {baseline_df[rh_col].min():.0f} – {baseline_df[rh_col].max():.0f} %")
+
+st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
+st.subheader("Thermal comfort (PMV)")
+zone_choice = st.selectbox("Zone", ZONES, help="Fanger Predicted Mean Vote for the selected zone.")
+pmv_col = f"{zone_choice} PEOPLE 1:Zone Thermal Comfort Fanger Model PMV [](TimeStep)"
+
+fig2 = go.Figure()
+fig2.add_hrect(y0=-0.5, y1=0.5, fillcolor=theme.BAND, opacity=0.10, line_width=0)
+fig2.add_trace(theme.line(None, x, baseline_df[pmv_col], "Baseline", theme.BASELINE))
+fig2.add_trace(theme.line(None, x_ai, ai_df[pmv_col], "AI closed-loop", theme.AI))
+theme.style(fig2, ylabel="PMV", height=340)
+fig2.add_annotation(
+    x=1, y=0.5, xref="paper", yref="y", text="comfort band", showarrow=False,
+    xanchor="right", yanchor="bottom", font=dict(size=11, color=theme.TEXT_MUTED),
+)
+st.plotly_chart(fig2, use_container_width=True)
+
+st.subheader("HVAC setpoints the agent chose")
+fig3 = go.Figure()
+fig3.add_trace(theme.line(None, x_ai, ai_df[COOL_COL], "Cooling setpoint", theme.AI))
+fig3.add_trace(theme.line(None, x, baseline_df[COOL_COL], "Baseline schedule", theme.BASELINE, dash="dot"))
+theme.style(fig3, ylabel="Cooling setpoint (°C)", height=320)
+theme.pad_y(fig3, pd.concat([ai_df[COOL_COL], baseline_df[COOL_COL]]))
+st.plotly_chart(fig3, use_container_width=True)
+st.caption(
+    f"The agent moved the cooling setpoint across {ai_df[COOL_COL].nunique()} distinct values "
+    f"({ai_df[COOL_COL].min():.1f}–{ai_df[COOL_COL].max():.1f} °C) against the baseline schedule's "
+    f"{baseline_df[COOL_COL].nunique()}. Server-side clamps hold it inside [22, 26] °C and cap "
+    "each change at 0.5 °C per decision cycle."
+)
+
+# --- Table view. Identity is never carried by colour alone, and every number
+# --- plotted above is readable here.
+st.markdown('<div class="rule"></div>', unsafe_allow_html=True)
+with st.expander("Results as a table"):
+    # Change is always AI minus baseline, so negative is the improvement in
+    # every row -- kwh_reduction_pct is stored as a reduction and so is negated.
+    st.dataframe(
+        pd.DataFrame(
+            [
+                {"Metric": "Total electricity (kWh)", "Baseline": baseline["total_kwh"], "AI closed-loop": ai["total_kwh"], "Change": f"{-summary['kwh_reduction_pct']:+.2f}%"},
+                {"Metric": "Peak demand (kW)", "Baseline": round(baseline["peak_demand_w"] / 1000, 2), "AI closed-loop": round(ai["peak_demand_w"] / 1000, 2), "Change": f"{peak_pct:+.2f}%"},
+                {"Metric": "PMV violations (%)", "Baseline": baseline["pmv_violation_pct"], "AI closed-loop": ai["pmv_violation_pct"], "Change": f"{pmv_delta:+.2f} pts"},
+            ]
+        ),
+        use_container_width=True,
+        hide_index=True,
+    )
+    st.caption("Change is AI minus baseline — negative is better in every row.")
+
 if len(available) > 1:
     with st.expander("Compare all sites"):
         rows = []
         for other in available:
             s = json.loads(other.summary_path.read_text())
             m = s.get("location", {})
+            (sm, sd), (em, ed) = other.run_period
+            fallback_period = f"{sm}/{sd}-{em}/{ed}" + (f"/{other.run_year}" if other.run_year else " (TMY)")
             rows.append(
                 {
                     "Site": m.get("label", other.label),
                     "Weather": m.get("weather_source", other.weather_source),
-                    "Period": m.get("period", "—"),
+                    "Period": m.get("period", fallback_period),
                     "Baseline kWh": s["baseline"]["total_kwh"],
                     "AI kWh": s["ai_closed_loop"]["total_kwh"],
-                    "Energy reduction %": s["kwh_reduction_pct"],
-                    "Baseline PMV viol. %": s["baseline"]["pmv_violation_pct"],
-                    "AI PMV viol. %": s["ai_closed_loop"]["pmv_violation_pct"],
+                    # Every delta column is signed the same way: change in the
+                    # metric, so negative is always the improvement. The stored
+                    # kwh_reduction_pct is a *reduction* (positive = less
+                    # energy), so it is negated here -- reporting it raw next to
+                    # a signed peak-demand change put two opposite sign
+                    # conventions in adjacent columns of the same table.
+                    "Energy Δ": f"{-s['kwh_reduction_pct']:+.2f}%",
+                    "Peak Δ": f"{100 * (s['ai_closed_loop']['peak_demand_w'] - s['baseline']['peak_demand_w']) / s['baseline']['peak_demand_w']:+.2f}%",
+                    "Comfort Δ": f"{s['ai_closed_loop']['pmv_violation_pct'] - s['baseline']['pmv_violation_pct']:+.2f} pts",
                 }
             )
         st.dataframe(pd.DataFrame(rows), use_container_width=True, hide_index=True)
         st.caption(
-            "Absolute kWh is not comparable across sites — different weather means a "
-            "different load to begin with. The reduction percentage is the comparable number."
+            "Δ columns are all AI minus baseline, so **negative is better in every one**. "
+            "Absolute kWh is not comparable across sites — different weather means a different "
+            "load to begin with; the Δ columns are the comparable ones."
         )
-
-st.divider()
-st.subheader("Time series: energy demand")
-
-baseline_df = pd.read_csv(REPO / baseline["timeseries_csv"])
-ai_df = pd.read_csv(REPO / ai["timeseries_csv"])
-baseline_df.columns = [c.strip() for c in baseline_df.columns]
-ai_df.columns = [c.strip() for c in ai_df.columns]
-
-demand_col = "Whole Building:Facility Total Electricity Demand Rate [W](TimeStep)"
-fig = go.Figure()
-fig.add_trace(go.Scatter(y=baseline_df[demand_col] / 1000, name="Baseline", line=dict(color="#888")))
-fig.add_trace(go.Scatter(y=ai_df[demand_col] / 1000, name="AI Closed-Loop", line=dict(color="#2ca02c")))
-fig.update_layout(xaxis_title="Timestep (15 min)", yaxis_title="Facility demand (kW)", height=400)
-st.plotly_chart(fig, use_container_width=True)
-
-# Outdoor conditions: the driver behind everything else, and the clearest
-# way to see that Hyderabad's monsoon week is a genuinely different problem
-# from Chicago's dry summer week.
-def _timestep_col(df, prefix):
-    """Match the TimeStep-resolution series, not the Hourly one. The stock
-    IDF already requests outdoor drybulb hourly, so a plain prefix match
-    returns a series a quarter the length of every other chart's, which
-    plots against the 15-minute x-axis badly misaligned."""
-    return next(
-        (c for c in df.columns if c.startswith(prefix) and c.endswith("(TimeStep)")), None
-    )
-
-
-temp_col = _timestep_col(baseline_df, "Environment:Site Outdoor Air Drybulb Temperature")
-rh_col = _timestep_col(baseline_df, "Environment:Site Outdoor Air Relative Humidity")
-if temp_col:
-    st.subheader("Outdoor conditions driving the run")
-    figw = go.Figure()
-    figw.add_trace(
-        go.Scatter(y=baseline_df[temp_col], name="Drybulb temp (C)", line=dict(color="#ff7f0e"))
-    )
-    if rh_col:
-        # Humidity on its own axis: in a monsoon climate the latent load is
-        # what the cooling system is actually fighting, and it is invisible
-        # if you only look at temperature.
-        figw.add_trace(
-            go.Scatter(
-                y=baseline_df[rh_col],
-                name="Relative humidity (%)",
-                line=dict(color="#1f77b4", dash="dot"),
-                yaxis="y2",
-            )
-        )
-        figw.update_layout(
-            yaxis2=dict(title="Relative humidity (%)", overlaying="y", side="right", range=[0, 100])
-        )
-    figw.update_layout(
-        xaxis_title="Timestep (15 min)", yaxis_title="Outdoor air temp (C)", height=340
-    )
-    st.plotly_chart(figw, use_container_width=True)
-
-st.subheader("Time series: zone comfort (PMV)")
-zone_choice = st.selectbox("Zone", ZONES)
-pmv_col = f"{zone_choice} PEOPLE 1:Zone Thermal Comfort Fanger Model PMV [](TimeStep)"
-fig2 = go.Figure()
-fig2.add_trace(go.Scatter(y=baseline_df[pmv_col], name="Baseline", line=dict(color="#888")))
-fig2.add_trace(go.Scatter(y=ai_df[pmv_col], name="AI Closed-Loop", line=dict(color="#2ca02c")))
-fig2.add_hrect(y0=-0.5, y1=0.5, fillcolor="green", opacity=0.08, line_width=0, annotation_text="comfort band")
-fig2.update_layout(xaxis_title="Timestep (15 min)", yaxis_title="PMV", height=400)
-st.plotly_chart(fig2, use_container_width=True)
-
-st.subheader("Time series: HVAC setpoints (AI run)")
-cool_col = "CLG-SETP-SCH:Schedule Value [](TimeStep)"
-heat_col = "HTG-SETP-SCH:Schedule Value [](TimeStep)"
-fig3 = go.Figure()
-fig3.add_trace(go.Scatter(y=ai_df[cool_col], name="Cooling setpoint", line=dict(color="#1f77b4")))
-fig3.add_trace(go.Scatter(y=ai_df[heat_col], name="Heating setpoint", line=dict(color="#d62728")))
-fig3.update_layout(xaxis_title="Timestep (15 min)", yaxis_title="Setpoint (C)", height=400)
-st.plotly_chart(fig3, use_container_width=True)
