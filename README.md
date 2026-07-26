@@ -26,11 +26,65 @@ cost — see `docs/ARCHITECTURE.md`'s "Results" and "Debugging note" sections
 for how the control policy got here (it failed in two different directions
 before this) and all 3 self-healing scenarios verified working end-to-end.
 
+### Hyderabad, 19–25 July 2026 (real observed monsoon week)
+
+| | Baseline | AI closed-loop | Change |
+|---|---|---|---|
+| Total electricity | 1021.5 kWh | 995.4 kWh | **-2.56%** |
+| Peak demand | 18,335 W | 18,569 W | **+1.28%** |
+| PMV comfort violations (occupied hrs) | 5.64% | 6.55% | +0.91 pts |
+
+The same agent, same policy, no code changes — and a visibly weaker result.
+That is the honest and more interesting finding: **the energy saving carries
+over to a new climate, but the peak-demand saving does not** (Chicago
+-4.27% became Hyderabad +1.28%).
+
+The weather explains it. Hyderabad's week is *milder* in dry-bulb terms than
+Chicago's (22.5–30.6°C vs 11.7–32.8°C) yet uses **more** energy, because the
+load is latent — 50–94% RH under 10/10 cloud cover, with no overnight
+cool-down to coast on (22.5°C minimum vs Chicago's 11.7°C). The agent's only
+lever is a dry-bulb setpoint, which has little authority over a
+dehumidification load, so raising it sheds less demand than it does in a dry
+climate while still costing comfort. Peak-shaving in particular depends on
+the solar-driven afternoon peak the monsoon cloud cover flattens away.
+
+## Sites
+
+The building can be re-sited without touching any of the agent code — the
+location is a parameter (`models/locations.py`), and the agent's control
+policy is climate-agnostic (it reasons from live PMV and demand telemetry,
+not from any assumption about the weather).
+
+| Site | Weather | Period |
+|---|---|---|
+| `chicago` (default) | EnergyPlus's bundled TMY3 typical-year file | July 1–7 |
+| `hyderabad` | **Real observed weather**, rebuilt into an `.epw` from the Open-Meteo ERA5 archive | July 19–25, 2026 |
+
+EnergyPlus ships weather files for five US cities and nothing else, so
+Hyderabad needs `models/fetch_weather.py`, which fetches the hour-by-hour
+conditions the site actually had on those real dates and writes a valid
+`.epw`. That also means the Hyderabad run is not a "typical July" — it is
+that specific monsoon week, which is a genuinely different control problem
+from Chicago's dry summer week: humid, heavily overcast, and latent-load
+dominated rather than driven by solar gain.
+
+The same script also derives ASHRAE-style design conditions from five years
+of the site's own hourly history, because EnergyPlus autosizes HVAC
+equipment from design days and does *not* read them from the weather file —
+left alone, the Hyderabad building would have been sized for Chicago's
+-17.3°C winter design day. Derived values for Hyderabad (1% cooling DB
+37.7°C, MCWB 21.8°C, 99% heating DB 16.5°C, hottest month April) line up
+closely with the published ASHRAE values for the station.
+
 ## Repo layout
 
 - `models/` — baseline `.idf` + weather file, the AI closed-loop variant,
   broken variants for the self-healing demo, and the prep scripts that
   generate all of them from EnergyPlus's stock `5ZoneAirCooled.idf`
+- `models/locations.py` — the site registry (lat/lon/timezone/elevation,
+  run period, weather source) every other script resolves paths through
+- `models/fetch_weather.py` — Open-Meteo ERA5 → `.epw` builder + design-day
+  derivation, for sites EnergyPlus has no weather file for
 - `plugin/eco_loop_plugin.py` — the EnergyPlus Python Plugin in-sim hook
   (stdlib-only; talks to the agent over HTTP, see architecture doc for why)
 - `agent/` — MCP server (`mcp_server.py`, `tools.py`), the LLM decision loop
@@ -80,6 +134,15 @@ ollama pull qwen2.5:7b-instruct
    python scripts/run_comparison.py
    ```
 
+   For another site, pass `--location`. Hyderabad additionally needs its
+   weather file built first (one-off; re-run to move to a different week):
+   ```
+   python models/fetch_weather.py          --location hyderabad
+   python models/prepare_baseline.py       --location hyderabad
+   python models/prepare_ai_closed_loop.py --location hyderabad
+   python scripts/run_comparison.py        --location hyderabad
+   ```
+
 4. **Self-healing demo** (crash → diagnose → patch → rerun):
    ```
    python scripts/self_heal_runner.py models/broken_bad_people_count.idf
@@ -91,6 +154,19 @@ ollama pull qwen2.5:7b-instruct
    ```
    streamlit run dashboard/app.py
    ```
+   The site picker lists every location that has a comparison summary.
+
+6. **Live view** (optional; needs `SUPABASE_URL` / `SUPABASE_ANON_KEY`).
+   Push the no-AI reference line for a site, then start a run — the live
+   page has its own site picker and shows the latest run for whichever site
+   is selected:
+   ```
+   python scripts/push_baseline_live.py --location hyderabad
+   python scripts/run_comparison.py    --location hyderabad
+   ```
+   Runs are tagged by site via an `ECO_LOOP_LOCATION` prefix on `run_id`,
+   so no Supabase schema change was needed and rows written before
+   multi-site support still read back correctly (as Chicago).
 
 ## Notes
 

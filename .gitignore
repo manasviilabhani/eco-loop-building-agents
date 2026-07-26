@@ -38,3 +38,7 @@ eplusmtr.*
 !runs/baseline_full/eplusout.csv
 !runs/ai_closed_loop_full/
 !runs/ai_closed_loop_full/eplusout.csv
+!runs/baseline_full_hyderabad/
+!runs/baseline_full_hyderabad/eplusout.csv
+!runs/ai_closed_loop_full_hyderabad/
+!runs/ai_closed_loop_full_hyderabad/eplusout.csv

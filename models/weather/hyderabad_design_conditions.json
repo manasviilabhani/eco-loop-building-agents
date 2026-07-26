@@ -1,0 +1,10 @@
+{
+  "source": "Open-Meteo ERA5 archive, 2021-07-19 to 2026-07-19 (5y hourly)",
+  "hours_analyzed": 43848,
+  "cooling_design_db_c": 37.7,
+  "cooling_design_mcwb_c": 21.8,
+  "heating_design_db_c": 16.5,
+  "daily_db_range_c": 12.0,
+  "hottest_month": 4,
+  "annual_mean_db_c": 26.0
+}

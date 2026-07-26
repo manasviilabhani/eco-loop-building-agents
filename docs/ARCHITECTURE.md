@@ -45,9 +45,52 @@
 Two full simulation runs are compared: **baseline** (`models/baseline.idf`,
 unmodified schedule-driven setpoints) vs. **AI closed-loop**
 (`models/ai_closed_loop.idf`, same building, agent-controlled setpoints).
-Both run over the same trimmed period (July 1-7, Chicago) with the same
-weather file, so the comparison isolates the effect of the agent's control
-decisions.
+Both run over the same trimmed period with the same weather file, so the
+comparison isolates the effect of the agent's control decisions.
+
+## Siting: making the location a parameter
+
+The building is run at two sites (`models/locations.py`): Chicago, on the
+TMY3 file EnergyPlus bundles, and Hyderabad, on the weather that site
+actually had during 19–25 July 2026.
+
+Nothing in the agent changed to support this, which is the point worth
+making: the control policy reasons from live PMV and demand telemetry it is
+handed each cycle, not from any embedded assumption about the climate, so
+re-siting the building is a data change rather than a code change. The
+`[22C, 26C]` setpoint envelope and the 0.5C-per-cycle rate limit are
+properties of the *building*, not of Chicago, and carry over unchanged.
+
+Three things did have to be handled, and they are the parts that would
+silently produce plausible-looking nonsense if skipped:
+
+- **There is no Indian weather file.** EnergyPlus ships five US cities.
+  `models/fetch_weather.py` pulls hourly ERA5 reanalysis from the Open-Meteo
+  archive and writes a conforming `.epw`. Fields ERA5 does not carry are
+  written as EPW missing-value sentinels rather than invented — notably
+  horizontal infrared, which EnergyPlus then correctly derives from the
+  opaque sky cover we *do* provide.
+
+- **Design days are not read from the weather file.** EnergyPlus autosizes
+  the HVAC equipment from `SizingPeriod:DesignDay` objects in the IDF. The
+  stock file carries Chicago's (-17.3C winter, 31.5C summer). Left in place,
+  the Hyderabad building would have been sized for a winter that never
+  happens and a cooling coil with dry-climate latent capacity — the run
+  would have completed successfully and reported meaningless numbers. They
+  are instead derived from five years of the site's own hourly record
+  (1% cooling DB 37.7C, MCWB 21.8C, 99% heating DB 16.5C), which lands close
+  to the published ASHRAE values for the station.
+
+- **The real calendar matters.** The occupancy schedule is weekday-only, so
+  the run period pins the actual year and lets EnergyPlus derive true
+  weekdays, rather than inheriting the stock file's hardcoded "start on
+  Tuesday".
+
+The chosen week is peak south-west monsoon: humid and heavily overcast
+rather than hot. That makes it a harder and more interesting control problem
+than Chicago's dry summer week — the cooling load is latent rather than
+solar-driven, so the lever the agent has (a dry-bulb setpoint) has less
+authority over the comfort metric it is being scored on.
 
 ## Process boundary: why there's an HTTP bridge at all
 

@@ -8,18 +8,33 @@ difference is this plugin wiring, so the baseline-vs-AI comparison isolates
 the effect of the agent's control decisions.
 """
 
+import argparse
+import sys
 from pathlib import Path
+
 from eppy.modeleditor import IDF
 
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from models import locations  # noqa: E402
+
 EPLUS_DIR = Path("/Applications/EnergyPlus-26-1-0")
-BASELINE_IDF = Path(__file__).parent / "baseline.idf"
-OUT_IDF = Path(__file__).parent / "ai_closed_loop.idf"
 PLUGIN_DIR = Path(__file__).parent.parent / "plugin"
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Build ai_closed_loop.idf for a site.")
+    locations.add_location_arg(parser)
+    args = parser.parse_args()
+    loc = locations.get(args.location)
+
+    if not loc.baseline_idf.exists():
+        raise SystemExit(
+            f"Missing {loc.baseline_idf}.\n"
+            f"Run: python models/prepare_baseline.py --location {loc.key}"
+        )
+
     IDF.setiddname(str(EPLUS_DIR / "Energy+.idd"))
-    idf = IDF(str(BASELINE_IDF))
+    idf = IDF(str(loc.baseline_idf))
 
     idf.newidfobject(
         "PYTHONPLUGIN:SEARCHPATHS",
@@ -37,8 +52,8 @@ def main():
         Plugin_Class_Name="EcoLoopController",
     )
 
-    idf.saveas(str(OUT_IDF))
-    print(f"Wrote {OUT_IDF}")
+    idf.saveas(str(loc.ai_idf))
+    print(f"Wrote {loc.ai_idf}  [{loc.label}]")
 
 
 if __name__ == "__main__":

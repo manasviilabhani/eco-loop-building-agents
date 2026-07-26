@@ -35,77 +35,81 @@ Timestep,
     4;                        !- Number of Timesteps per Hour
 
 Site:Location,
-    CHICAGO_IL_USA TMY2-94846,    !- Name
-    41.78,                    !- Latitude
-    -87.75,                   !- Longitude
-    -6,                       !- Time Zone
-    190;                      !- Elevation
+    HYDERABAD_Telangana_IND Open-Meteo,    !- Name
+    17.385,                   !- Latitude
+    78.4867,                  !- Longitude
+    5.5,                      !- Time Zone
+    505;                      !- Elevation
 
-SizingPeriod:DesignDay,
-    CHICAGO_IL_USA Annual Heating 99% Design Conditions DB,    !- Name
+SIZINGPERIOD:DESIGNDAY,
+    Hyderabad Annual Heating 99% Design Conditions DB,    !- Name
     1,                        !- Month
     21,                       !- Day of Month
     WinterDesignDay,          !- Day Type
-    -17.3,                    !- Maximum DryBulb Temperature
+    16.5,                     !- Maximum DryBulb Temperature
     0,                        !- Daily DryBulb Temperature Range
-    ,                         !- DryBulb Temperature Range Modifier Type
+    DefaultMultipliers,       !- DryBulb Temperature Range Modifier Type
     ,                         !- DryBulb Temperature Range Modifier Day Schedule Name
     Wetbulb,                  !- Humidity Condition Type
-    -17.3,                    !- Wetbulb or DewPoint at Maximum DryBulb
+    16.5,                     !- Wetbulb or DewPoint at Maximum DryBulb
     ,                         !- Humidity Condition Day Schedule Name
     ,                         !- Humidity Ratio at Maximum DryBulb
     ,                         !- Enthalpy at Maximum DryBulb
     ,                         !- Daily WetBulb Temperature Range
-    99063,                    !- Barometric Pressure
-    4.9,                      !- Wind Speed
-    270,                      !- Wind Direction
+    95404,                    !- Barometric Pressure
+    2.5,                      !- Wind Speed
+    0,                        !- Wind Direction
     No,                       !- Rain Indicator
     No,                       !- Snow Indicator
     No,                       !- Daylight Saving Time Indicator
     ASHRAEClearSky,           !- Solar Model Indicator
     ,                         !- Beam Solar Day Schedule Name
     ,                         !- Diffuse Solar Day Schedule Name
-    ,                         !- ASHRAE Clear Sky Optical Depth for Beam Irradiance taub
-    ,                         !- ASHRAE Clear Sky Optical Depth for Diffuse Irradiance taud
-    0;                        !- Sky Clearness
+    0,                        !- ASHRAE Clear Sky Optical Depth for Beam Irradiance taub
+    0,                        !- ASHRAE Clear Sky Optical Depth for Diffuse Irradiance taud
+    0,                        !- Sky Clearness
+    ,                         !- Maximum Number Warmup Days
+    FullResetAtBeginEnvironment;    !- Begin Environment Reset Mode
 
-SizingPeriod:DesignDay,
-    CHICAGO_IL_USA Annual Cooling 1% Design Conditions DB/MCWB,    !- Name
-    7,                        !- Month
+SIZINGPERIOD:DESIGNDAY,
+    Hyderabad Annual Cooling 1% Design Conditions DB/MCWB,    !- Name
+    4,                        !- Month
     21,                       !- Day of Month
     SummerDesignDay,          !- Day Type
-    31.5,                     !- Maximum DryBulb Temperature
-    10.7,                     !- Daily DryBulb Temperature Range
-    ,                         !- DryBulb Temperature Range Modifier Type
+    37.7,                     !- Maximum DryBulb Temperature
+    12,                       !- Daily DryBulb Temperature Range
+    DefaultMultipliers,       !- DryBulb Temperature Range Modifier Type
     ,                         !- DryBulb Temperature Range Modifier Day Schedule Name
     Wetbulb,                  !- Humidity Condition Type
-    23,                       !- Wetbulb or DewPoint at Maximum DryBulb
+    21.8,                     !- Wetbulb or DewPoint at Maximum DryBulb
     ,                         !- Humidity Condition Day Schedule Name
     ,                         !- Humidity Ratio at Maximum DryBulb
     ,                         !- Enthalpy at Maximum DryBulb
     ,                         !- Daily WetBulb Temperature Range
-    99063,                    !- Barometric Pressure
-    5.3,                      !- Wind Speed
-    230,                      !- Wind Direction
+    95404,                    !- Barometric Pressure
+    2.5,                      !- Wind Speed
+    0,                        !- Wind Direction
     No,                       !- Rain Indicator
     No,                       !- Snow Indicator
     No,                       !- Daylight Saving Time Indicator
     ASHRAEClearSky,           !- Solar Model Indicator
     ,                         !- Beam Solar Day Schedule Name
     ,                         !- Diffuse Solar Day Schedule Name
-    ,                         !- ASHRAE Clear Sky Optical Depth for Beam Irradiance taub
-    ,                         !- ASHRAE Clear Sky Optical Depth for Diffuse Irradiance taud
-    1;                        !- Sky Clearness
+    0,                        !- ASHRAE Clear Sky Optical Depth for Beam Irradiance taub
+    0,                        !- ASHRAE Clear Sky Optical Depth for Diffuse Irradiance taud
+    1,                        !- Sky Clearness
+    ,                         !- Maximum Number Warmup Days
+    FullResetAtBeginEnvironment;    !- Begin Environment Reset Mode
 
 RunPeriod,
     Run Period 1,             !- Name
     7,                        !- Begin Month
-    1,                        !- Begin Day of Month
-    ,                         !- Begin Year
+    19,                       !- Begin Day of Month
+    2026,                     !- Begin Year
     7,                        !- End Month
-    7,                        !- End Day of Month
-    ,                         !- End Year
-    Tuesday,                  !- Day of Week for Start Day
+    25,                       !- End Day of Month
+    2026,                     !- End Year
+    ,                         !- Day of Week for Start Day
     Yes,                      !- Use Weather File Holidays and Special Days
     Yes,                      !- Use Weather File Daylight Saving Period
     No,                       !- Apply Weekend Holiday Rule
@@ -1974,7 +1978,7 @@ People,
     SPACE1-1,                 !- Zone or ZoneList or Space or SpaceList Name
     OCCUPY-1,                 !- Number of People Schedule Name
     people,                   !- Number of People Calculation Method
-    -5,                       !- Number of People
+    11,                       !- Number of People
     ,                         !- People per Floor Area
     ,                         !- Floor Area per Person
     0.3,                      !- Fraction Radiant
@@ -4049,16 +4053,6 @@ OUTPUT:VARIABLE,
     Timestep;                 !- Reporting Frequency
 
 OUTPUT:VARIABLE,
-    Environment,              !- Key Value
-    Site Outdoor Air Drybulb Temperature,    !- Variable Name
-    Timestep;                 !- Reporting Frequency
-
-OUTPUT:VARIABLE,
-    Environment,              !- Key Value
-    Site Outdoor Air Relative Humidity,    !- Variable Name
-    Timestep;                 !- Reporting Frequency
-
-OUTPUT:VARIABLE,
     Clg-SetP-Sch,             !- Key Value
     Schedule Value,           !- Variable Name
     Timestep;                 !- Reporting Frequency
@@ -4183,3 +4177,16 @@ Meter:CustomDecrement,
     Electricity:Building,     !- Source Meter Name
     ,                         !- Key Name 1
     MyGeneralLights;          !- Output Variable or Meter Name 1
+
+PYTHONPLUGIN:SEARCHPATHS,
+    Eco Loop Search Paths,    !- Name
+    Yes,                      !- Add Current Working Directory to Search Path
+    Yes,                      !- Add Input File Directory to Search Path
+    Yes,                      !- Add epin Environment Variable to Search Path
+    /Users/manasvilabhani/eco-loop-building-agents/plugin;    !- Search Path 1
+
+PYTHONPLUGIN:INSTANCE,
+    Eco Loop Controller Instance,    !- Name
+    No,                       !- Run During Warmup Days
+    eco_loop_plugin,          !- Python Module Name
+    EcoLoopController;        !- Plugin Class Name

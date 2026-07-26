@@ -10,12 +10,17 @@ page can plot it as a complete comparison line sitting next to the AI run's
 line as it grows in real time.
 
 Requires SUPABASE_URL / SUPABASE_ANON_KEY (same as agent/live_push.py) and a
-baseline run already completed (runs/baseline_full/eplusout.csv, produced by
-scripts/run_comparison.py).
+baseline run already completed for the chosen site (produced by
+scripts/run_comparison.py --location <site>).
 
-Usage: python scripts/push_baseline_live.py
+Each site gets its own reference series, tagged run_id
+"baseline-reference-<site>", so the live view can pair the right baseline
+with whichever site's AI run is streaming.
+
+Usage: python scripts/push_baseline_live.py [--location chicago|hyderabad]
 """
 
+import argparse
 import json
 import os
 import sys
@@ -24,24 +29,35 @@ from pathlib import Path
 
 import pandas as pd
 
-REPO = Path(__file__).parent.parent
-BASELINE_CSV = REPO / "runs" / "baseline_full" / "eplusout.csv"
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from models import locations  # noqa: E402
+
 ZONES = ["SPACE1-1", "SPACE2-1", "SPACE3-1", "SPACE4-1", "SPACE5-1"]
-RUN_ID = "baseline-reference"
 
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "").rstrip("/")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 
 
 def main():
+    parser = argparse.ArgumentParser(description="Push a site's baseline reference series to Supabase.")
+    locations.add_location_arg(parser)
+    args = parser.parse_args()
+    loc = locations.get(args.location)
+    baseline_csv = loc.run_dir("baseline") / "eplusout.csv"
+    run_id = f"baseline-reference-{loc.key}"
+
     if not SUPABASE_URL or not SUPABASE_ANON_KEY:
         print("Set SUPABASE_URL and SUPABASE_ANON_KEY first.")
         sys.exit(1)
-    if not BASELINE_CSV.exists():
-        print(f"No baseline data at {BASELINE_CSV} -- run scripts/run_comparison.py first.")
+    if not baseline_csv.exists():
+        print(
+            f"No baseline data at {baseline_csv} -- run "
+            f"scripts/run_comparison.py --location {loc.key} first."
+        )
         sys.exit(1)
 
-    df = pd.read_csv(BASELINE_CSV)
+    df = pd.read_csv(baseline_csv)
     df.columns = [c.strip() for c in df.columns]
 
     # One row per hour (every 4th 15-min timestep), matching the AI run's
@@ -56,7 +72,7 @@ def main():
     for i, r in hourly.iterrows():
         rows.append(
             {
-                "run_id": RUN_ID,
+                "run_id": run_id,
                 "kind": "baseline",
                 "hour_index": i + 1,
                 "sim_time": "",
@@ -71,7 +87,7 @@ def main():
 
     # Clear any previous baseline-reference push before inserting fresh rows.
     del_req = urllib.request.Request(
-        f"{SUPABASE_URL}/rest/v1/live_decisions?run_id=eq.{RUN_ID}",
+        f"{SUPABASE_URL}/rest/v1/live_decisions?run_id=eq.{run_id}",
         method="DELETE",
         headers={"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {SUPABASE_ANON_KEY}"},
     )
@@ -89,7 +105,7 @@ def main():
         },
     )
     urllib.request.urlopen(req, timeout=15)
-    print(f"Pushed {len(rows)} baseline reference rows (run_id={RUN_ID})")
+    print(f"Pushed {len(rows)} baseline reference rows for {loc.label} (run_id={run_id})")
 
 
 if __name__ == "__main__":

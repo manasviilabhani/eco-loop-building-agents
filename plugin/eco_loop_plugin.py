@@ -19,6 +19,7 @@ Each simulated hour (on the hour):
 """
 
 import json
+import os
 import time
 import urllib.request
 import urllib.error
@@ -80,7 +81,17 @@ class EcoLoopController(EnergyPlusPlugin):
         # Identifies this simulation run for the live dashboard view (see
         # agent/live_push.py) -- generated once per EnergyPlus process so
         # separate runs don't get plotted as one continuous series.
-        self.run_id = f"{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
+        #
+        # The site is encoded as a run_id prefix rather than a new column,
+        # deliberately: the live_decisions table is already deployed on a
+        # hosted Supabase project, and a prefix keeps the live view
+        # site-aware with no schema migration and no breakage of the rows
+        # already in there (rows written before this change have no prefix
+        # and are read back as the default site). scripts/run_comparison.py
+        # sets ECO_LOOP_LOCATION when it launches EnergyPlus; a bare
+        # `energyplus` invocation just gets the default.
+        site = os.environ.get("ECO_LOOP_LOCATION", "chicago")
+        self.run_id = f"{site}-{time.strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:6]}"
         self.hour_index = 0
 
         self.h = {}  # sensor/actuator handles, keyed by name

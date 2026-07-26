@@ -1,0 +1,26 @@
+{
+  "location": {
+    "key": "hyderabad",
+    "label": "Hyderabad, Telangana (India)",
+    "period": "7/19-7/25/2026",
+    "weather_source": "observed",
+    "weather_file": "hyderabad_2026-07-19_2026-07-25.epw"
+  },
+  "baseline": {
+    "total_kwh": 1021.5,
+    "peak_demand_w": 18335.0,
+    "pmv_violations": 62,
+    "pmv_readings": 1100,
+    "pmv_violation_pct": 5.64,
+    "timeseries_csv": "runs/baseline_full_hyderabad/eplusout.csv"
+  },
+  "ai_closed_loop": {
+    "total_kwh": 995.4,
+    "peak_demand_w": 18569.4,
+    "pmv_violations": 72,
+    "pmv_readings": 1100,
+    "pmv_violation_pct": 6.55,
+    "timeseries_csv": "runs/ai_closed_loop_full_hyderabad/eplusout.csv"
+  },
+  "kwh_reduction_pct": 2.56
+}

@@ -4,31 +4,42 @@ a comparison summary (JSON + per-timestep CSVs) for the dashboard.
 Requires the agent service (agent/service.py) to be running on :8765 before
 invoking the AI closed-loop run.
 
-Usage: python scripts/run_comparison.py
+Usage: python scripts/run_comparison.py [--location chicago|hyderabad]
 """
 
+import argparse
 import json
+import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 import pandas as pd
 
-REPO = Path(__file__).parent.parent
+REPO = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(REPO))
+from models import locations  # noqa: E402
+
 EPLUS = "/Applications/EnergyPlus-26-1-0/energyplus"
-WEATHER = "/Applications/EnergyPlus-26-1-0/WeatherData/USA_IL_Chicago-OHare.Intl.AP.725300_TMY3.epw"
 PMV_LO, PMV_HI = -0.5, 0.5
 
 
-def run(idf_path: Path, out_dir: Path):
+def run(idf_path: Path, out_dir: Path, weather: Path, location_key: str):
     if out_dir.exists():
         shutil.rmtree(out_dir)
     out_dir.mkdir(parents=True)
+    # The plugin reads ECO_LOOP_LOCATION to tag its run_id, which is how the
+    # hosted live view tells one site's run from another (see
+    # plugin/eco_loop_plugin.py). It only affects live-view labelling --
+    # nothing about the simulation itself depends on it.
+    env = {**os.environ, "ECO_LOOP_LOCATION": location_key}
     subprocess.run(
-        [EPLUS, "-w", WEATHER, "-d", str(out_dir), "--readvars", str(idf_path)],
+        [EPLUS, "-w", str(weather), "-d", str(out_dir), "--readvars", str(idf_path)],
         check=True,
         capture_output=True,
         text=True,
+        env=env,
     )
 
 
@@ -71,16 +82,32 @@ def summarize(out_dir: Path) -> dict:
 
 
 def main():
-    baseline_out = REPO / "runs" / "baseline_full"
-    ai_out = REPO / "runs" / "ai_closed_loop_full"
+    parser = argparse.ArgumentParser(description="Baseline vs. AI closed-loop comparison run.")
+    locations.add_location_arg(parser)
+    args = parser.parse_args()
+    loc = locations.get(args.location)
 
-    print("=== Running baseline (full week) ===")
-    run(REPO / "models" / "baseline.idf", baseline_out)
+    for path, hint in [
+        (loc.weather_file, f"python models/fetch_weather.py --location {loc.key}"),
+        (loc.baseline_idf, f"python models/prepare_baseline.py --location {loc.key}"),
+        (loc.ai_idf, f"python models/prepare_ai_closed_loop.py --location {loc.key}"),
+    ]:
+        if not path.exists():
+            raise SystemExit(f"Missing {path}.\nRun: {hint}")
+
+    baseline_out = loc.run_dir("baseline")
+    ai_out = loc.run_dir("ai_closed_loop")
+    (start_m, start_d), (end_m, end_d) = loc.run_period
+    period = f"{start_m}/{start_d}-{end_m}/{end_d}" + (f"/{loc.run_year}" if loc.run_year else " (TMY)")
+    print(f"=== Site: {loc.label} | period {period} | weather {loc.weather_file.name} ===")
+
+    print("\n=== Running baseline (full week) ===")
+    run(loc.baseline_idf, baseline_out, loc.weather_file, loc.key)
     baseline_summary = summarize(baseline_out)
     print(json.dumps(baseline_summary, indent=2))
 
     print("\n=== Running AI closed-loop (full week) ===")
-    run(REPO / "models" / "ai_closed_loop.idf", ai_out)
+    run(loc.ai_idf, ai_out, loc.weather_file, loc.key)
     ai_summary = summarize(ai_out)
     print(json.dumps(ai_summary, indent=2))
 
@@ -89,12 +116,19 @@ def main():
     )
 
     comparison = {
+        "location": {
+            "key": loc.key,
+            "label": loc.label,
+            "period": period,
+            "weather_source": loc.weather_source,
+            "weather_file": loc.weather_file.name,
+        },
         "baseline": baseline_summary,
         "ai_closed_loop": ai_summary,
         "kwh_reduction_pct": pct_reduction,
     }
 
-    out_path = REPO / "runs" / "comparison_summary.json"
+    out_path = loc.summary_path
     out_path.write_text(json.dumps(comparison, indent=2))
     print(f"\n=== kWh reduction: {pct_reduction}% ===")
     print(f"Wrote {out_path}")

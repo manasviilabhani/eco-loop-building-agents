@@ -4049,6 +4049,16 @@ OUTPUT:VARIABLE,
     Timestep;                 !- Reporting Frequency
 
 OUTPUT:VARIABLE,
+    Environment,              !- Key Value
+    Site Outdoor Air Drybulb Temperature,    !- Variable Name
+    Timestep;                 !- Reporting Frequency
+
+OUTPUT:VARIABLE,
+    Environment,              !- Key Value
+    Site Outdoor Air Relative Humidity,    !- Variable Name
+    Timestep;                 !- Reporting Frequency
+
+OUTPUT:VARIABLE,
     Clg-SetP-Sch,             !- Key Value
     Schedule Value,           !- Variable Name
     Timestep;                 !- Reporting Frequency

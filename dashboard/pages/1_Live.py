@@ -2,19 +2,31 @@
 simulation run's decisions as they happen, growing in real time.
 
 Requires a local simulation to actually be running (agent/service.py with
-SUPABASE_URL / SUPABASE_ANON_KEY set, driving an EnergyPlus run against
-models/ai_closed_loop.idf) -- this page only displays what that local
+SUPABASE_URL / SUPABASE_ANON_KEY set, driving an EnergyPlus run against the
+chosen site's ai_closed_loop IDF) -- this page only displays what that local
 machine is producing; it does not run anything itself. See
 docs/ARCHITECTURE.md for why the simulation can't run on this hosting.
+
+Site awareness: the simulation's site is encoded as a prefix on run_id
+("hyderabad-20260726-...") rather than as its own column, so this works
+against the already-deployed Supabase table with no schema migration. Rows
+written before sites existed carry no prefix and are read back as the
+default site -- see `location_of()`.
 
 Credentials come from Streamlit secrets (st.secrets), configured in the
 app's Settings -> Secrets on Streamlit Community Cloud -- never hardcoded.
 """
 
+import sys
+from pathlib import Path
+
 import pandas as pd
 import plotly.graph_objects as go
 import requests
 import streamlit as st
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
+from models import locations  # noqa: E402
 
 st.set_page_config(page_title="Eco-Loop: Live", layout="wide")
 st.title("Live simulation view")
@@ -32,16 +44,36 @@ if not SUPABASE_URL or not SUPABASE_ANON_KEY:
 HEADERS = {"apikey": SUPABASE_ANON_KEY, "Authorization": f"Bearer {SUPABASE_ANON_KEY}"}
 
 
-def fetch_latest_run_id() -> str | None:
+def location_of(run_id: str) -> str:
+    """Which site a run_id belongs to. Anything without a known site prefix
+    predates multi-site support and came from a Chicago run, so it maps to
+    the default rather than being dropped from the view."""
+    for key in locations.LOCATIONS:
+        if run_id.startswith(f"{key}-"):
+            return key
+    return locations.DEFAULT_LOCATION
+
+
+def fetch_latest_run_id(location_key: str) -> str | None:
+    """Most recent AI run for this site. Fetches a window of recent runs and
+    filters client-side: PostgREST's `like` would need escaping and the row
+    count here is tiny, so a prefix match in Python is simpler and safer."""
     resp = requests.get(
         f"{SUPABASE_URL}/rest/v1/live_decisions",
         headers=HEADERS,
-        params={"select": "run_id", "kind": "eq.ai_closed_loop", "order": "created_at.desc", "limit": 1},
+        params={
+            "select": "run_id",
+            "kind": "eq.ai_closed_loop",
+            "order": "created_at.desc",
+            "limit": 200,
+        },
         timeout=10,
     )
     resp.raise_for_status()
-    rows = resp.json()
-    return rows[0]["run_id"] if rows else None
+    for row in resp.json():
+        if location_of(row["run_id"]) == location_key:
+            return row["run_id"]
+    return None
 
 
 def fetch_run(run_id: str) -> pd.DataFrame:
@@ -55,27 +87,46 @@ def fetch_run(run_id: str) -> pd.DataFrame:
     return pd.DataFrame(resp.json())
 
 
-def fetch_baseline() -> pd.DataFrame:
-    resp = requests.get(
-        f"{SUPABASE_URL}/rest/v1/live_decisions",
-        headers=HEADERS,
-        params={"run_id": "eq.baseline-reference", "order": "hour_index.asc"},
-        timeout=10,
-    )
-    resp.raise_for_status()
-    return pd.DataFrame(resp.json())
+def fetch_baseline(location_key: str) -> pd.DataFrame:
+    """Per-site baseline reference. Falls back to the unsuffixed run_id for
+    the default site, which is what the original single-site push wrote."""
+    candidates = [f"baseline-reference-{location_key}"]
+    if location_key == locations.DEFAULT_LOCATION:
+        candidates.append("baseline-reference")
+    for run_id in candidates:
+        resp = requests.get(
+            f"{SUPABASE_URL}/rest/v1/live_decisions",
+            headers=HEADERS,
+            params={"run_id": f"eq.{run_id}", "order": "hour_index.asc"},
+            timeout=10,
+        )
+        resp.raise_for_status()
+        rows = resp.json()
+        if rows:
+            return pd.DataFrame(rows)
+    return pd.DataFrame()
+
+
+site = st.selectbox(
+    "Site",
+    list(locations.LOCATIONS.values()),
+    format_func=lambda l: l.label,
+    help="Shows the most recent live run for this site. Runs are tagged by "
+    "site automatically when started via scripts/run_comparison.py --location.",
+)
 
 
 @st.fragment(run_every="3s")
 def live_section():
-    run_id = fetch_latest_run_id()
-    baseline_df = fetch_baseline()
+    run_id = fetch_latest_run_id(site.key)
+    baseline_df = fetch_baseline(site.key)
 
     if run_id is None:
         st.info(
-            "No live run yet. Start one locally: set SUPABASE_URL / SUPABASE_ANON_KEY, "
-            "run `python -m agent.service`, then run EnergyPlus against "
-            "models/ai_closed_loop.idf. This page updates automatically every 3s."
+            f"No live run yet for **{site.label}**. Start one locally: set "
+            "SUPABASE_URL / SUPABASE_ANON_KEY, run `python -m agent.service`, then "
+            f"`python scripts/run_comparison.py --location {site.key}`. "
+            "This page updates automatically every 3s."
         )
         return
 
@@ -83,7 +134,8 @@ def live_section():
     st.caption(f"run_id: `{run_id}` -- {len(df)} decision(s) so far, latest: {df['sim_time'].iloc[-1]}")
     if baseline_df.empty:
         st.caption(
-            "No baseline reference loaded yet -- run `python scripts/push_baseline_live.py` "
+            f"No baseline reference loaded yet for {site.label} -- run "
+            f"`python scripts/push_baseline_live.py --location {site.key}` "
             "locally to show the no-AI comparison line."
         )
 
