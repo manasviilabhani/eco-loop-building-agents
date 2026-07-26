@@ -15,12 +15,12 @@
     "timeseries_csv": "runs/baseline_full_hyderabad/eplusout.csv"
   },
   "ai_closed_loop": {
-    "total_kwh": 995.4,
-    "peak_demand_w": 18569.4,
-    "pmv_violations": 72,
+    "total_kwh": 988.8,
+    "peak_demand_w": 17664.1,
+    "pmv_violations": 90,
     "pmv_readings": 1100,
-    "pmv_violation_pct": 6.55,
+    "pmv_violation_pct": 8.18,
     "timeseries_csv": "runs/ai_closed_loop_full_hyderabad/eplusout.csv"
   },
-  "kwh_reduction_pct": 2.56
+  "kwh_reduction_pct": 3.2
 }

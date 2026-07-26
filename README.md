@@ -28,25 +28,44 @@ before this) and all 3 self-healing scenarios verified working end-to-end.
 
 ### Hyderabad, 19–25 July 2026 (real observed monsoon week)
 
-| | Baseline | AI closed-loop | Change |
-|---|---|---|---|
-| Total electricity | 1021.5 kWh | 995.4 kWh | **-2.56%** |
-| Peak demand | 18,335 W | 18,569 W | **+1.28%** |
-| PMV comfort violations (occupied hrs) | 5.64% | 6.55% | +0.91 pts |
+The same week was run twice, with identical inputs and no code changes
+between them. The baseline is deterministic and came out **identical** both
+times (1021.5 kWh, 18,335 W peak, 5.64% violations). The AI run did not:
 
-The same agent, same policy, no code changes — and a visibly weaker result.
-That is the honest and more interesting finding: **the energy saving carries
-over to a new climate, but the peak-demand saving does not** (Chicago
--4.27% became Hyderabad +1.28%).
+| | Run 1 | Run 2 |
+|---|---|---|
+| Total electricity | 995.4 kWh (**-2.56%**) | 988.8 kWh (**-3.20%**) |
+| Peak demand | 18,569 W (**+1.28%**) | 17,664 W (**-3.66%**) |
+| PMV violations (occupied hrs) | 6.55% (+0.91 pts) | 8.18% (+2.54 pts) |
 
-The weather explains it. Hyderabad's week is *milder* in dry-bulb terms than
-Chicago's (22.5–30.6°C vs 11.7–32.8°C) yet uses **more** energy, because the
-load is latent — 50–94% RH under 10/10 cloud cover, with no overnight
-cool-down to coast on (22.5°C minimum vs Chicago's 11.7°C). The agent's only
-lever is a dry-bulb setpoint, which has little authority over a
-dehumidification load, so raising it sheds less demand than it does in a dry
-climate while still costing comfort. Peak-shaving in particular depends on
-the solar-driven afternoon peak the monsoon cloud cover flattens away.
+**This spread is itself a finding, and it constrains what can honestly be
+claimed.** The agent is an LLM sampling tokens, so two runs over the same
+weather make different control choices; nothing here is seeded. Reading a
+single run as *the* result — as an earlier version of this README did —
+overstates the precision badly.
+
+What survives repetition, and what does not:
+
+- **Energy reduction is real and consistent**: 2.6–3.2% across runs, always
+  in the same direction.
+- **Comfort consistently regresses**, by 0.9–2.5 points. The energy saving
+  is partly bought with comfort, not purely found.
+- **The peak-demand effect is not established.** It flipped sign between
+  runs (+1.28% then -3.66%), so with n=2 there is no defensible claim about
+  peak shaving in this climate either way. It needs many more runs, or a
+  fixed seed, before it means anything.
+
+Comparing against Chicago (-3.56% energy, -4.27% peak) needs the same
+caution: Chicago is also a single unseeded run, so the cross-climate gap may
+be partly sampling noise rather than climate.
+
+What *is* solid is the physical setup. Hyderabad's week is milder in
+dry-bulb terms than Chicago's (22.5–30.6°C vs 11.7–32.8°C) yet uses **more**
+energy, because the load is latent — 50–94% RH under 10/10 cloud cover, with
+no overnight cool-down to coast on (22.5°C minimum vs Chicago's 11.7°C). A
+dry-bulb setpoint is a weak lever against a dehumidification load, which is
+a sound reason to *expect* the agent to do less well here; it just isn't
+something these two runs can be said to have measured.
 
 ## Sites
 
