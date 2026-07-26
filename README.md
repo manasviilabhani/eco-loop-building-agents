@@ -195,6 +195,9 @@ ollama pull qwen2.5:7b-instruct
    python -m agent.service &
    python scripts/live_daemon.py --site hyderabad
    ```
+   Pass a comma-separated list to alternate between sites in one process —
+   `--site hyderabad,chicago`. They are cycled rather than run in parallel
+   because both would contend for the single local Ollama instance.
    Each cycle pulls today's weather from Open-Meteo's *forecast* endpoint
    (the hours already observed today, plus the forecast for the rest of it),
    rebuilds the model for today's date, runs the baseline, then runs the AI

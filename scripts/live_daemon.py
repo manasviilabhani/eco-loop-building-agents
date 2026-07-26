@@ -36,6 +36,7 @@ running (python -m agent.service), and Ollama up.
 
 Usage:
     python scripts/live_daemon.py --site hyderabad
+    python scripts/live_daemon.py --site hyderabad,chicago    # alternate sites
     python scripts/live_daemon.py --site hyderabad --once
     python scripts/live_daemon.py --site hyderabad --interval 900
 """
@@ -110,7 +111,15 @@ def cycle(site: str, push_baseline: bool) -> None:
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--site", default="hyderabad", help="base site key (default: hyderabad)")
+    # Sites are cycled one after another in a single process rather than run
+    # as parallel daemons: they would otherwise contend for the one local
+    # Ollama instance, and two simultaneous runs make each other slower
+    # without either finishing sooner.
+    parser.add_argument(
+        "--site", default="hyderabad",
+        help="base site key, or a comma-separated list to alternate between "
+             "(e.g. hyderabad,chicago). Default: hyderabad",
+    )
     parser.add_argument(
         "--interval", type=int, default=DEFAULT_INTERVAL_S,
         help=f"seconds to wait between cycles (default: {DEFAULT_INTERVAL_S})",
@@ -128,15 +137,21 @@ def main():
             "dashboard.\nRun:  source .env.local"
         )
 
-    log(f"live daemon starting: site={args.site} interval={args.interval}s once={args.once}")
+    sites = [s.strip() for s in args.site.split(",") if s.strip()]
+    for s in sites:
+        if s not in locations.LOCATIONS:
+            raise SystemExit(f"Unknown site {s!r}. Available: {', '.join(sorted(locations.LOCATIONS))}")
+
+    log(f"live daemon starting: sites={sites} interval={args.interval}s once={args.once}")
     while True:
-        try:
-            cycle(args.site, push_baseline=not args.no_baseline_push)
-        except Exception:
-            # A daemon that dies on one bad cycle is worse than useless -- a
-            # transient Open-Meteo timeout or a stopped agent service should
-            # cost one cycle, not the whole stream.
-            log("cycle FAILED:\n" + traceback.format_exc())
+        for site in sites:
+            try:
+                cycle(site, push_baseline=not args.no_baseline_push)
+            except Exception:
+                # A daemon that dies on one bad cycle is worse than useless --
+                # a transient Open-Meteo timeout or a stopped agent service
+                # should cost one cycle, not the whole stream.
+                log(f"cycle FAILED for {site}:\n" + traceback.format_exc())
         if args.once:
             return
         log(f"sleeping {args.interval}s")

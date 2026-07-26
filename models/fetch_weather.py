@@ -211,8 +211,17 @@ def design_conditions(loc: locations.Location) -> dict:
 
 def _epw_header(loc: locations.Location, start: date, end: date, ground_temps: list[float]) -> list[str]:
     gt = ",".join(f"{t:.2f}" for t in ground_temps)
+    # The data-source field has to tell the truth about which endpoint this
+    # came from: a "today" file is part observation and part forecast, and
+    # labelling that as ERA5 reanalysis (as this line used to, unconditionally)
+    # would misdescribe it to anyone who opened the file later.
+    source = (
+        "Open-Meteo forecast endpoint (part observed, part FORECAST)"
+        if loc.weather_source == "forecast"
+        else "Open-Meteo ERA5 reanalysis (observed)"
+    )
     return [
-        f"LOCATION,{loc.city},{loc.region},{loc.country},Open-Meteo ERA5 reanalysis (observed),"
+        f"LOCATION,{loc.city},{loc.region},{loc.country},{source},"
         f"{loc.wmo},{loc.latitude:.3f},{loc.longitude:.3f},{loc.time_zone},{loc.elevation_m:.1f}",
         "DESIGN CONDITIONS,0",
         "TYPICAL/EXTREME PERIODS,0",
