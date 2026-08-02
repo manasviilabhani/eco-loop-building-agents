@@ -380,6 +380,14 @@ function attachHover(cv, tipEl, getCfg) {
   };
   cv.addEventListener("pointermove", move);
   cv.addEventListener("pointerleave", () => (tipEl.style.opacity = 0));
+  // Leaving the *document* outright -- which is what happens when the pointer
+  // exits the component iframe this page is embedded in -- does not reliably
+  // fire pointerleave on the canvas, so a tooltip could stay frozen on screen
+  // after the cursor had gone. Catch that case too.
+  for (const ev of ["pointerleave", "blur"]) {
+    (ev === "blur" ? window : document).addEventListener(
+      ev, () => (tipEl.style.opacity = 0));
+  }
 }
 
 /* ---------- weather ------------------------------------------------------ */

@@ -57,6 +57,11 @@ st.html(
 st.title("Eco-Loop Building Agents")
 st.caption("A local LLM controlling HVAC setpoints inside a live EnergyPlus simulation, versus the building's own schedule.")
 
+# Explicit cross-link rather than relying on the sidebar alone: the sidebar
+# labels pages by filename, so this one reads "app", which tells a first-time
+# visitor nothing about the live view existing.
+st.page_link("pages/1_Live.py", label="Live view — today, up to the current hour", icon="🔴")
+
 available = [loc for loc in locations.LOCATIONS.values() if loc.summary_path.exists()]
 if not available:
     st.error(
