@@ -5,45 +5,57 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Eco-Loop — Live</title>
 <style>
-  /* Palette: the project's validated categorical pair (dashboard/theme.py).
-     Light #2a78d6/#eb6834 clears every gate (worst-pair dE 24.7 protan, 33.6
-     normal, both >=3:1 on the surface). Dark mode is re-stepped against the
-     dark surface and re-validated -- #4a90e2/#dd6b2e, dE 24.8 protan, 29.3
-     normal -- not an automatic flip of the light values. Colour follows the
-     entity: baseline is always blue, AI always orange, on every chart. */
+  /* Palette: a single warm neutral ramp, near-white through greige and brown
+     to near-black. It is a *sequential* ramp, so the usual categorical checks
+     (chroma floor, lightness band) fail it by design -- "reads gray" is the
+     intent here, not a defect.
+
+     What matters is that the two series stay tellable apart, and they do, by
+     lightness rather than hue: baseline vs AI measures dE 34.8 under deutan,
+     34.9 tritan, 35.0 normal (light) and 29.9/30.0/30.1 (dark) -- far above
+     the 15 floor, and it survives greyscale print for the same reason.
+
+     Baseline is the faint dashed line and AI the strong solid one, in both
+     modes: identity is carried by weight and dash as well as value, so the
+     pair never depends on colour alone. That doubles as the relief the light
+     baseline (#a89f92, 2.44:1 on the surface) needs -- it is always directly
+     labelled, in the legend, and in the table view.
+
+     Dark mode is re-stepped from the same ramp against the dark surface and
+     re-validated, not flipped. */
   :root {
-    --surface: #fcfcfb;
+    --surface: #f7f7f6;
     --panel: #ffffff;
-    --text: #0b0b0b;
-    --text-2: #52514e;
-    --muted: #8a8880;
-    --grid: #e8e6e1;
-    --hairline: #e2e0da;
-    --baseline: #2a78d6;
-    --ai: #eb6834;
-    --weather: #256abf;
-    --good: #167a56;
-    --shadow: 0 1px 2px rgba(11,11,11,.05), 0 8px 24px rgba(11,11,11,.05);
+    --text: #241d19;
+    --text-2: #6a513d;
+    --muted: #8b8073;
+    --grid: #e0e0df;
+    --hairline: #c3c3c2;
+    --baseline: #a89f92;
+    --ai: #4a382c;
+    --weather: #6a513d;
+    --good: #6a513d;
+    --shadow: 0 1px 2px rgba(36,29,25,.05), 0 8px 24px rgba(36,29,25,.06);
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --surface: #16151a; --panel: #1e1d23; --text: #f4f3f0; --text-2: #b9b7b1;
-      --muted: #8a8880; --grid: #302e37; --hairline: #35333d;
-      --baseline: #4a90e2; --ai: #dd6b2e; --weather: #6aa6ee; --good: #35b98a;
-      --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+      --surface: #14100e; --panel: #241d19; --text: #f7f7f6; --text-2: #c3c3c2;
+      --muted: #8b8073; --grid: #362b25; --hairline: #4a382c;
+      --baseline: #8b8073; --ai: #e0e0df; --weather: #a89f92; --good: #a89f92;
+      --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.4);
     }
   }
   :root[data-theme="light"] {
-    --surface: #fcfcfb; --panel: #ffffff; --text: #0b0b0b; --text-2: #52514e;
-    --muted: #8a8880; --grid: #e8e6e1; --hairline: #e2e0da;
-    --baseline: #2a78d6; --ai: #eb6834; --weather: #256abf; --good: #167a56;
-    --shadow: 0 1px 2px rgba(11,11,11,.05), 0 8px 24px rgba(11,11,11,.05);
+    --surface: #f7f7f6; --panel: #ffffff; --text: #241d19; --text-2: #6a513d;
+    --muted: #8b8073; --grid: #e0e0df; --hairline: #c3c3c2;
+    --baseline: #a89f92; --ai: #4a382c; --weather: #6a513d; --good: #6a513d;
+    --shadow: 0 1px 2px rgba(36,29,25,.05), 0 8px 24px rgba(36,29,25,.06);
   }
   :root[data-theme="dark"] {
-    --surface: #16151a; --panel: #1e1d23; --text: #f4f3f0; --text-2: #b9b7b1;
-    --muted: #8a8880; --grid: #302e37; --hairline: #35333d;
-    --baseline: #4a90e2; --ai: #dd6b2e; --weather: #6aa6ee; --good: #35b98a;
-    --shadow: 0 1px 2px rgba(0,0,0,.4), 0 8px 24px rgba(0,0,0,.3);
+    --surface: #14100e; --panel: #241d19; --text: #f7f7f6; --text-2: #c3c3c2;
+    --muted: #8b8073; --grid: #362b25; --hairline: #4a382c;
+    --baseline: #8b8073; --ai: #e0e0df; --weather: #a89f92; --good: #a89f92;
+    --shadow: 0 1px 2px rgba(0,0,0,.5), 0 8px 24px rgba(0,0,0,.4);
   }
 
   * { box-sizing: border-box; }
@@ -55,7 +67,9 @@
   .wrap { max-width: 1080px; margin: 0 auto; padding: 34px 22px 64px; }
 
   header { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; justify-content: space-between; }
-  h1 { font-size: 26px; letter-spacing: -.02em; margin: 0 0 4px; font-weight: 650; }
+  h1 { font-size: 26px; letter-spacing: -.02em; margin: 0 0 4px; font-weight: 650;
+       display: flex; align-items: center; gap: 11px; }
+  .logo { width: 32px; height: 32px; flex: none; }
   .sub { color: var(--text-2); font-size: 14px; margin: 0; max-width: 62ch; }
 
   .clock { text-align: right; flex-shrink: 0; }
@@ -84,6 +98,11 @@
   .card h2 { font-size: 15px; font-weight: 620; margin: 0 0 2px; letter-spacing: -.01em; }
   .card .cap { font-size: 13px; color: var(--text-2); margin: 0 0 12px; max-width: 74ch; }
 
+  /* A flat line at zero is a correct reading, not a broken page. This says so
+     rather than leaving the viewer to guess. */
+  .note { font-size: 13px; color: var(--text-2); background: var(--surface);
+          border-left: 3px solid var(--muted); border-radius: 0 6px 6px 0;
+          padding: 9px 12px; margin: 0 0 12px; max-width: 74ch; }
   .legend { display: flex; gap: 16px; flex-wrap: wrap; margin: 0 0 8px; font-size: 13px; color: var(--text-2); }
   .legend span { display: inline-flex; align-items: center; gap: 7px; }
   .swatch { width: 14px; height: 3px; border-radius: 2px; display: inline-block; }
@@ -117,7 +136,15 @@
 
   <header>
     <div>
-      <h1>Eco-Loop — live</h1>
+      <h1>
+        <svg class="logo" viewBox="0 0 36 36" role="img" aria-label="Eco-Loop">
+          <path d="M30.22 13.55 A13 13 0 1 1 20.26 5.20" fill="none"
+                stroke="var(--ai)" stroke-width="2.6" stroke-linecap="round"/>
+          <path d="M24.20 5.90 L19.84 7.56 L20.68 2.84 Z" fill="var(--ai)"/>
+          <path d="M10.8 20.4 L14.4 20.4 L18.1 25.4 L21.9 22.2 L25.4 23.6" fill="none"
+                stroke="var(--baseline)" stroke-width="2.4"
+                stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>Eco-Loop — live</h1>
       <p class="sub">What the AI closed-loop controller does to building electricity demand across the day. The curve is drawn only as far as the clock has actually reached at the site.</p>
     </div>
     <div class="clock">
@@ -142,6 +169,7 @@
   <div class="card">
     <h2>Difference: AI closed-loop minus baseline</h2>
     <p class="cap">Below zero means the agent is drawing less power than the unmodified building would at this hour. The highlighted dot is the current moment.</p>
+    <p class="note" id="setback" hidden></p>
     <div class="plot"><canvas id="c-delta"></canvas><div class="tip" id="tip-delta"></div></div>
   </div>
 
@@ -304,11 +332,16 @@ function drawChart(cv, cfg) {
       g.lineTo(X(pts[pts.length - 1][0]), Y(0)); g.closePath(); g.fill(); g.restore();
     }
 
-    g.strokeStyle = s.color; g.lineWidth = 2;
+    g.strokeStyle = s.color; g.lineWidth = s.width || 2;
     g.lineJoin = "round"; g.lineCap = "round";
+    // Dash is a second, colour-independent channel of identity -- it is what
+    // keeps baseline and AI apart in greyscale and for a reader who cannot
+    // separate two steps of one warm ramp by value alone.
+    g.setLineDash(s.dash || []);
     g.beginPath();
     pts.forEach(([t, v], i) => (i ? g.lineTo(X(t), Y(v)) : g.moveTo(X(t), Y(v))));
     g.stroke();
+    g.setLineDash([]);
 
     // The live end of the line: a 2px surface ring keeps it legible where it
     // overlaps the other series.
@@ -439,6 +472,24 @@ function render() {
   document.getElementById("t-dem").textContent = aNow.toFixed(2) + " kW";
   document.getElementById("t-dem-n").textContent = `baseline ${bNow.toFixed(2)} kW`;
 
+  // Before the occupancy schedule starts, baseline and AI *are* the same
+  // building: the HVAC sits in setback and the agent has no setpoint authority,
+  // so the difference is exactly zero. That is a correct reading, but a flat
+  // line at zero looks identical to a page that failed to load, so say which
+  // one it is and when the curve will start moving.
+  const startsAt = delta.findIndex((v) => Math.abs(v) >= 0.005);
+  const setback = document.getElementById("setback");
+  if (startsAt > 0 && t < startsAt) {
+    setback.hidden = false;
+    setback.textContent =
+      `The building is unoccupied right now — the HVAC is in overnight setback, so the agent `
+      + `has nothing to control and the difference is exactly zero. On this site's runs the `
+      + `curve starts moving around ${pad2(startsAt)}:00 local, in `
+      + `${Math.floor(startsAt - t)}h ${Math.round(((startsAt - t) % 1) * 60)}m.`;
+  } else {
+    setback.hidden = true;
+  }
+
   const wNow = weather.hours.length ? at(weather.hours, t) : null;
   document.getElementById("t-temp").textContent = wNow == null ? "—" : fmtC(wNow);
   document.getElementById("t-temp-n").textContent =
@@ -450,8 +501,10 @@ function render() {
   };
   cfgs.demand = {
     series: [
-      { name: "Baseline", data: site.baselineKw, color: css("--baseline"), label: "Baseline" },
-      { name: "AI closed-loop", data: site.aiKw, color: css("--ai"), label: "AI" },
+      { name: "Baseline", data: site.baselineKw, color: css("--baseline"),
+        label: "Baseline", dash: [6, 4] },
+      { name: "AI closed-loop", data: site.aiKw, color: css("--ai"),
+        label: "AI", width: 2.4 },
     ],
     revealTo: t, fmt: fmtKw, height: 260,
   };

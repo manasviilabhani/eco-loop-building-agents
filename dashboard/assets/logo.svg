@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 36 36" width="36" height="36" role="img" aria-label="Eco-Loop">
+  <title>Eco-Loop</title>
+  <!-- The closed control loop: a 320-degree arc with an arrowhead, so it reads
+       as a cycle that is still running rather than a plain ring. -->
+  <path d="M30.22 13.55 A13 13 0 1 1 20.26 5.20"
+        fill="none" stroke="#4a382c" stroke-width="2.6" stroke-linecap="round"/>
+  <path d="M24.20 5.90 L19.84 7.56 L20.68 2.84 Z" fill="#4a382c"/>
+  <!-- Inside it, the thing the loop actually does: a demand curve pulled down.
+       Same shape as the difference chart on the live page. -->
+  <path d="M10.8 20.4 L14.4 20.4 L18.1 25.4 L21.9 22.2 L25.4 23.6"
+        fill="none" stroke="#8b8073" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

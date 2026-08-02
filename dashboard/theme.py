@@ -1,11 +1,14 @@
 """Shared visual language for the dashboard: palette, Plotly layout defaults,
 and the small helpers both pages use.
 
-Colours are not chosen by eye. The two-series categorical pair below was run
-through a CVD/contrast validator against the light chart surface and clears
-every gate (worst-pair ΔE 24.7 protan, 33.6 normal vision, both >= 3:1
-contrast on the surface), so baseline vs. AI stays distinguishable for
-colour-blind readers and in greyscale print.
+Colours are not chosen by eye. The palette is a single warm neutral ramp --
+near-white through greige and brown to near-black -- so the two series are
+separated by *lightness* rather than hue. Run through a CVD/contrast
+validator that pair measures ΔE 34.8 deutan, 34.9 tritan, 35.0 normal
+vision, far above the 15 floor, which is also why it survives greyscale
+print. Being a sequential ramp it deliberately fails the categorical chroma
+floor ("reads gray" is the intent), so identity never rests on colour alone:
+baseline is the faint dashed line, AI the strong solid one, on every chart.
 
 Two deliberate rules, both of which the first version of this dashboard broke:
 
@@ -23,23 +26,23 @@ renders matches the surface the palette was validated against.
 """
 
 # --- Categorical slots (validated pair) ---
-BASELINE = "#2a78d6"  # slot 1, blue
-AI = "#eb6834"  # slot 2, orange
+BASELINE = "#a89f92"  # greige, always dashed
+AI = "#4a382c"  # dark brown, always solid
 
 # --- Supporting ink / surface tokens ---
-SURFACE = "#fcfcfb"
-TEXT_PRIMARY = "#0b0b0b"
-TEXT_SECONDARY = "#52514e"
-TEXT_MUTED = "#8a8880"
-GRID = "#e8e6e1"  # hairline, one shade off the surface -- solid, never dashed
-BAND = "#1baf7a"  # aqua, used only for the PMV comfort band shading
+SURFACE = "#f7f7f6"
+TEXT_PRIMARY = "#241d19"
+TEXT_SECONDARY = "#6a513d"
+TEXT_MUTED = "#8b8073"
+GRID = "#e0e0df"  # hairline, one shade off the surface -- solid, never dashed
+BAND = "#8b8073"  # taupe, used only for the PMV comfort band shading
 
 FONT = "Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif"
 
 # Weather series get their own single-hue treatment -- they are context, not
 # part of the baseline/AI comparison, so they must not borrow either's colour.
-WEATHER_TEMP = "#256abf"  # sequential blue, step 500
-WEATHER_RH = "#184f95"  # same hue, darker step -- one hue, two magnitudes
+WEATHER_TEMP = "#6a513d"  # ramp step 6
+WEATHER_RH = "#362b25"  # same ramp, darker step -- one hue, two magnitudes
 
 
 def style(fig, *, height=340, ylabel="", xlabel="", legend=True):

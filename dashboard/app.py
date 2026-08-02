@@ -38,6 +38,8 @@ COOL_COL = "CLG-SETP-SCH:Schedule Value [](TimeStep)"
 HEAT_COL = "HTG-SETP-SCH:Schedule Value [](TimeStep)"
 
 st.set_page_config(page_title="Eco-Loop Building Agents", layout="wide", page_icon="🏢")
+# Same mark on every page, including the collapsed sidebar.
+st.logo(str(Path(__file__).resolve().parent / "assets" / "logo.svg"), size="large")
 
 # st.html, not st.markdown(unsafe_allow_html=True): the markdown route is not
 # honoured on Streamlit Community Cloud, which rendered the raw <style> block
@@ -49,7 +51,7 @@ st.html(
       .block-container { padding-top: 2.5rem; max-width: 1180px; }
       [data-testid="stMetricValue"] { font-size: 1.75rem; }
       .hero { font-size: 3.4rem; line-height: 1; font-weight: 600; letter-spacing: -0.02em; }
-      .hero-sub { color: #52514e; font-size: 0.95rem; margin-top: .35rem; }
+      .hero-sub { color: #6a513d; font-size: 0.95rem; margin-top: .35rem; }
     </style>
     """
 )
@@ -155,7 +157,10 @@ st.divider()
 st.subheader("Electricity demand")
 
 fig = go.Figure()
-fig.add_trace(theme.line(None, x, baseline_df[DEMAND_COL] / 1000, "Baseline", theme.BASELINE))
+# Baseline is dashed everywhere: the palette separates the two series by
+# lightness within one warm ramp, so dash carries identity independently of
+# colour (see dashboard/theme.py).
+fig.add_trace(theme.line(None, x, baseline_df[DEMAND_COL] / 1000, "Baseline", theme.BASELINE, dash="dash"))
 fig.add_trace(theme.line(None, x_ai, ai_df[DEMAND_COL] / 1000, "AI closed-loop", theme.AI))
 theme.style(fig, ylabel="Facility demand (kW)", height=360)
 st.plotly_chart(fig, width="stretch")
@@ -195,7 +200,7 @@ pmv_col = f"{zone_choice} PEOPLE 1:Zone Thermal Comfort Fanger Model PMV [](Time
 
 fig2 = go.Figure()
 fig2.add_hrect(y0=-0.5, y1=0.5, fillcolor=theme.BAND, opacity=0.10, line_width=0)
-fig2.add_trace(theme.line(None, x, baseline_df[pmv_col], "Baseline", theme.BASELINE))
+fig2.add_trace(theme.line(None, x, baseline_df[pmv_col], "Baseline", theme.BASELINE, dash="dash"))
 fig2.add_trace(theme.line(None, x_ai, ai_df[pmv_col], "AI closed-loop", theme.AI))
 theme.style(fig2, ylabel="PMV", height=340)
 fig2.add_annotation(

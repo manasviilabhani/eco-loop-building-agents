@@ -27,6 +27,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2]))
 PAGE = Path(__file__).resolve().parents[1] / "live.html"
 
 st.set_page_config(page_title="Eco-Loop: Live", layout="wide", page_icon="🏢")
+st.logo(str(PAGE.parent / "assets" / "logo.svg"), size="large")
 
 # The component iframe is the whole page here, so strip the padding Streamlit
 # would otherwise wrap it in -- the embedded document has its own.
@@ -57,9 +58,11 @@ html = PAGE.read_text()
 # still overrides this, since it sets the same attribute.
 html = html.replace('<html lang="en">', '<html lang="en" data-theme="light">', 1)
 
-# A component iframe cannot size itself to its content, so the height is fixed
-# here: 1720 fits the document (measured 1672 at full width) without leaving a
-# band of dead space under the footer. scrolling=True is the safety net rather
-# than the intent -- at a narrow viewport the text rewraps taller, and an inner
-# scrollbar in that case is much better than silently clipping the footer.
-components.html(html, height=1720, scrolling=True)
+# A component iframe cannot size itself to its content, so the height is fixed.
+# Slack is cheap now that the embedded page's surface and Streamlit's
+# backgroundColor are the same value: leftover height is invisible, while
+# coming up short would clip the footer. The page also grows a setback notice
+# during unoccupied hours, so the tallest case is not the common one.
+# scrolling=True remains the safety net for narrow viewports, where the text
+# rewraps taller than any fixed height can anticipate.
+components.html(html, height=1800, scrolling=True)

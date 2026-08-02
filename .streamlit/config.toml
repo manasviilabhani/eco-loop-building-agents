@@ -1,11 +1,11 @@
 # Pin the light theme so charts render against the same surface the palette
-# in dashboard/theme.py was validated against (#fcfcfb). Without this the
+# in dashboard/theme.py was validated against (#f7f7f6). Without this the
 # viewer's OS dark mode would swap the surface out from under a palette
 # whose contrast ratios were checked against light.
 [theme]
 base = "light"
-primaryColor = "#2a78d6"
-backgroundColor = "#fcfcfb"
-secondaryBackgroundColor = "#f4f3f0"
-textColor = "#0b0b0b"
+primaryColor = "#4a382c"
+backgroundColor = "#f7f7f6"
+secondaryBackgroundColor = "#e0e0df"
+textColor = "#241d19"
 font = "sans serif"
