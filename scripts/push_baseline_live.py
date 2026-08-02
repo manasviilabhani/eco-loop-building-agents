@@ -1,5 +1,10 @@
 """Pushes the baseline (no-AI) run's hourly data to Supabase as a static
-reference series for the live dashboard view (dashboard/pages/1_Live.py).
+reference series for any consumer of the live stream.
+
+(The Streamlit page that used to read this, dashboard/pages/1_Live.py, has
+been replaced by the standalone dashboard/live.html, which does not use
+Supabase. The push path is kept because the stream itself still works and
+agent/live_push.py still writes to it during a run.)
 
 The baseline has no plugin/agent attached -- it's a plain schedule-driven
 EnergyPlus run that finishes in seconds, so there's nothing to observe "live"

@@ -111,6 +111,9 @@ closely with the published ASHRAE values for the station.
 - `scripts/` — `run_comparison.py` (baseline vs. AI full-week run + summary
   export), `self_heal_runner.py` (crash → diagnose → patch → retry loop)
 - `dashboard/app.py` — Streamlit app comparing baseline vs. AI closed-loop
+- `dashboard/build_live_page.py` → `dashboard/live.html` — standalone live
+  page: the day's AI-vs-baseline difference, revealed only up to the site's
+  current local time, over weather fetched live from Open-Meteo
 - `docs/ARCHITECTURE.md` — system architecture deliverable
 - `runs/` — per-run EnergyPlus outputs and the comparison summary
   (gitignored bulk; `comparison_summary.json` is what the dashboard reads)
@@ -175,17 +178,28 @@ ollama pull qwen2.5:7b-instruct
    ```
    The site picker lists every location that has a comparison summary.
 
-6. **Live view** (optional; needs `SUPABASE_URL` / `SUPABASE_ANON_KEY`).
-   Push the no-AI reference line for a site, then start a run — the live
-   page has its own site picker and shows the latest run for whichever site
-   is selected:
+6. **Live page** — a standalone single file, no server and no Supabase:
    ```
-   python scripts/push_baseline_live.py --location hyderabad
-   python scripts/run_comparison.py    --location hyderabad
+   python dashboard/build_live_page.py     # regenerates dashboard/live.html
    ```
-   Runs are tagged by site via an `ECO_LOOP_LOCATION` prefix on `run_id`,
-   so no Supabase schema change was needed and rows written before
-   multi-site support still read back correctly (as Chicago).
+   `live.html` shows what the agent does to demand across the day, drawn only
+   as far as the site's current local time — nothing past "now" is rendered,
+   so there is no flat run-out or phantom forecast. It carries its own clock,
+   fetches that site's real weather from Open-Meteo in the browser (refreshed
+   every 15 min), and inlines the measured baseline-vs-AI hourly profiles from
+   `runs/`, so it works offline apart from the weather call. Re-run the
+   generator after any new `run_comparison.py` to pick up new results.
+
+   Serve it (or just open the file) — a local server is only needed because
+   the browser blocks the weather fetch from a `file://` origin:
+   ```
+   python -m http.server 8791 --directory dashboard
+   ```
+
+   It replaced a Streamlit page that streamed a locally-running simulation
+   through Supabase. The push path behind that (`agent/live_push.py`,
+   `scripts/push_baseline_live.py`) still works and still tags runs by site
+   via an `ECO_LOOP_LOCATION` prefix on `run_id`; nothing reads it right now.
 
 7. **Live "today" daemon** — continuously simulates the current day at a real
    site on freshly fetched weather, so the live view always has the agent
